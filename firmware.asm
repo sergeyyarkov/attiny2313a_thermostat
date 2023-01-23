@@ -7,7 +7,7 @@
 ; Package: SOIC-20W_7.5x12.8mm_P1.27mm
 ; Assembler: AVR macro assembler 2.2.7
 ; Clock frequency: 12 MHz External Crystal Oscillator
-; Fuses: lfuse: , hfuse: , efuse: , lock:
+; Fuses: lfuse: 0x4F, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
 ;
 ; Written by Sergey Yarkov 22.01.2023
 
@@ -16,12 +16,24 @@
 
 .DEF tmp_r_a = r16
 
-.DSEG
+;========================================;
+;                LABELS                  ;
+;========================================;
+
+.EQU LED_POWER_PORT = PD6
+
+
+;========================================;
+;              CODE SEGMENT              ;
+;========================================;
 
 .CSEG
 .ORG 0x00
 
-; MCU VECTORS
+;========================================;
+;                VECTORS                 ;
+;========================================;
+
 rjmp 	RESET_vect			      ; Program start at RESET vector
 reti                        ; External Interrupt Request 0 / inactive
 reti		                    ; External Interrupt Request 1 / inactive
@@ -55,17 +67,47 @@ MCU_INIT:
   rjmp LOOP
 
 INIT_PORTS:
-  ldi r16, (1<<PD6)
+  ldi r16, (1<<LED_POWER_PORT)
   out DDRD, r16
   out PORTD, r16
 ret
 
-;
-; MAIN PROGRAM LOOP
+;========================================;
+;            MAIN PROGRAM LOOP           ;
+;========================================;
+
 LOOP:
-  nop
+  ldi r16, (1<<LED_POWER_PORT)
+  out PORTD, r16
+
+  rcall DELAY
+  rcall DELAY
+
+  ldi r16, (0<<LED_POWER_PORT)
+  out PORTD, r16
+
+  rcall DELAY
+  rcall DELAY
+
   rjmp LOOP
 
+DELAY:
+  ldi     r16, 255     ; 1 clock cycle
+  _DEL_1:
+    ldi   r17, 255    ; 1 clock cycle
+  _DEL_2:
+    dec   r17         ; 1 clock cycle
+    nop               ; 1 clock cycle
+    brne  _DEL_2      ; 2 clock cycle when jumping / 1 when continue 
+
+    dec   r16         ; 1 clock cycle
+    brne  _DEL_1      ; 2 clock cycle when jumping / 1 when continue 
+ret
+
 INFO: .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+
+;========================================;
+;             EEPROM SEGMENT             ;
+;========================================;
 
 .ESEG
