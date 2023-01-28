@@ -15,13 +15,16 @@
 .LIST
 
 .DEF tmp_r_a = r16
+.DEF COUNTER = r20
 
 ;========================================;
 ;                LABELS                  ;
 ;========================================;
 
-.EQU LED_POWER_PORT = PD6
-
+.EQU LED_POWER_PORT   = PD6
+.EQU CLOCK_PIN        = PB0   ; ST_CP on 74HC595
+.EQU DATA_PIN         = PB1   ; DS on 74HC595
+.EQU LATCH_PIN        = PB2   ; SH_CP on 74HC595
 
 ;========================================;
 ;              CODE SEGMENT              ;
@@ -35,41 +38,95 @@
 ;========================================;
 
 rjmp 	RESET_vect			      ; Program start at RESET vector
-reti                        ; External Interrupt Request 0 / inactive
-reti		                    ; External Interrupt Request 1 / inactive
-reti                        ; Timer/Counter1 Capture Event / inactive
-reti		                    ; Timer/Counter1 Compare Match A / inactive
-reti                        ; Timer/Counter1 Overflow / inactive
-reti                        ; Timer/Counter0 Overflow / inactive
-reti                        ; USART0, Rx Complete / inactive
-reti                        ; USART0 Data Register Empty / inactive
-reti						            ; USART0, Tx Complete / inactive
-reti                        ; Analog Comparator / inactive
-reti	                      ; Pin Change Interrupt Request 0/ inactive
-reti                        ; Timer/Counter1 Compare Match B / inactive
-reti                        ; Timer/Counter0 Compare Match A / inactive
-reti                        ; Timer/Counter0 Compare Match B / inactive
-reti                        ; USI Start Condition/ inactive
-reti                        ; USI Overflow / inactive
-reti                        ; EEPROM Ready/ inactive
-reti                        ; Watchdog Timer Overflow / inactive
-reti                        ; Pin Change Interrupt Request 1 / inactive
-reti                        ; Pin Change Interrupt Request 2 / inactive
+;reti                        ; External Interrupt Request 0 / inactive
+;reti		                    ; External Interrupt Request 1 / inactive
+;reti                        ; Timer/Counter1 Capture Event / inactive
+;reti		                    ; Timer/Counter1 Compare Match A / inactive
+;reti                        ; Timer/Counter1 Overflow / inactive
+;reti                        ; Timer/Counter0 Overflow / inactive
+;reti                        ; USART0, Rx Complete / inactive
+;reti                        ; USART0 Data Register Empty / inactive
+;reti						            ; USART0, Tx Complete / inactive
+;reti                        ; Analog Comparator / inactive
+;reti	                      ; Pin Change Interrupt Request 0/ inactive
+;reti                        ; Timer/Counter1 Compare Match B / inactive
+;reti                        ; Timer/Counter0 Compare Match A / inactive
+;reti                        ; Timer/Counter0 Compare Match B / inactive
+;reti                        ; USI Start Condition/ inactive
+;reti                        ; USI Overflow / inactive
+;reti                        ; EEPROM Ready/ inactive
+;reti                        ; Watchdog Timer Overflow / inactive
+;reti                        ; Pin Change Interrupt Request 1 / inactive
+;reti                        ; Pin Change Interrupt Request 2 / inactive
 
 RESET_vect:
-  ;
-  ; INIT STACK POINTER
-  ldi tmp_r_a, low(RAMEND)
-  out SPL, tmp_r_a
+  ;========================================;
+  ;        INITIALIZE STACK POINTER        ;
+  ;========================================;
+  ldi       tmp_r_a, low(RAMEND)
+  out       SPL, tmp_r_a
 
 MCU_INIT:
-  rcall INIT_PORTS
-  rjmp LOOP
+  ;=======================================================
+  ;  POWER LED    <------------>   PD6                   ;
+  ;    - This LED is used to indicate that device        ;
+  ;       is working correctly                           ;
+  ;                                                      ;
+  ;=======================================================
+  rcall     INIT_PORTS
+
+  ;========================================;
+  ;       USI IS USED TO COMMUNICATE       ;
+  ;     WITH SHIFT REGISTER (74HC595N)     ;
+  ;========================================;
+  rcall     INIT_USI
+
+  ldi       COUNTER, 0
+  rjmp      LOOP
 
 INIT_PORTS:
-  ldi r16, (1<<LED_POWER_PORT)
-  out DDRD, r16
-  out PORTD, r16
+  ldi       r16, (1<<LED_POWER_PORT)
+  out       DDRD, r16
+  ldi       r16, (1<<CLOCK_PIN) | (1<<LATCH_PIN) | (1<<DATA_PIN)
+  out       DDRB, r16
+ret
+
+INIT_USI:
+
+ret
+
+;========================================;
+;          SEND BYTE TO 74HC595          ;
+;========================================;
+TRANSMIT_595:
+  push      r19
+  mov       r19, COUNTER
+  ldi       r16, 8
+  _TRANSMIT_595_LOOP:
+    lsl     r19
+    brcc    _TRANSMIT_595_SEND_LOW
+    brcs    _TRANSMIT_595_SEND_HIGH
+    
+    _TRANSMIT_595_SEND_HIGH:
+      sbi     PORTB, DATA_PIN
+      rjmp    _TRANSMIT_595_COMMIT
+
+    _TRANSMIT_595_SEND_LOW:
+      cbi     PORTB, DATA_PIN
+
+    _TRANSMIT_595_COMMIT:
+      sbi      PORTB, CLOCK_PIN
+      cbi      PORTB, CLOCK_PIN
+      sbi      PORTB, LATCH_PIN
+      cbi      PORTB, LATCH_PIN 
+    dec      r16
+    brne     _TRANSMIT_595_LOOP
+  pop        r19
+ret
+
+SUBPROGRAM_LED_SHIFTING:
+  rcall     TRANSMIT_595
+  inc       COUNTER
 ret
 
 ;========================================;
@@ -77,37 +134,44 @@ ret
 ;========================================;
 
 LOOP:
-  ldi r16, (1<<LED_POWER_PORT)
-  out PORTD, r16
-
-  rcall DELAY
-  rcall DELAY
-
-  ldi r16, (0<<LED_POWER_PORT)
-  out PORTD, r16
-
-  rcall DELAY
-  rcall DELAY
-
-  rjmp LOOP
+  rcall     TOGGLE_POWER_LED
+  rcall     SUBPROGRAM_LED_SHIFTING
+  rcall     DELAY
+  rjmp      LOOP
 
 DELAY:
-  ldi     r16, 255     ; 1 clock cycle
-  _DEL_1:
-    ldi   r17, 255    ; 1 clock cycle
-  _DEL_2:
-    dec   r17         ; 1 clock cycle
-    nop               ; 1 clock cycle
-    brne  _DEL_2      ; 2 clock cycle when jumping / 1 when continue 
+  push      r16
+  push      r17
+  cli
+  ldi       r16, 20    ; 1
+  _DELAY_1:
+    ldi     r17, 255   
+  _DELAY_2:
+    dec     r17         
+    nop                 
+    nop                
+    nop                 
+    brne    _DELAY_2    
 
-    dec   r16         ; 1 clock cycle
-    brne  _DEL_1      ; 2 clock cycle when jumping / 1 when continue 
+    dec     r16
+    brne    _DELAY_1    
+  sei
+
+  pop       r17
+  pop       r16
+ret                    
+
+TOGGLE_POWER_LED:
+  ldi       r16,  (1<<LED_POWER_PORT)
+  in        r17,  PORTD
+  eor       r17,  r16
+  out       PORTD, r17
 ret
 
-INFO: .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
 
 ;========================================;
 ;             EEPROM SEGMENT             ;
 ;========================================;
 
 .ESEG
+INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"

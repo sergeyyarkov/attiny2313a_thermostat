@@ -5,7 +5,7 @@ Path:        /home/sergeyyarkov/Documents/Applications/attiny2313a_thermostat/
 Source file: firmware.asm
 Hex file:    firmware.hex
 Eeprom file: firmware.eep
-Compiled:    24.01.2023, 01:15:04
+Compiled:    28.01.2023, 02:47:03
 Pass:        2
 
      1: ;
@@ -28,136 +28,207 @@ Pass:        2
     15: .LIST
     16: 
     17: .DEF tmp_r_a = r16
-    18: 
-    19: ;========================================;
-    20: ;                LABELS                  ;
-    21: ;========================================;
-    22: 
-    23: .EQU LED_POWER_PORT = PD6
-    24: 
-    25: 
-    26: ;========================================;
-    27: ;              CODE SEGMENT              ;
-    28: ;========================================;
-    29: 
-    30: .CSEG
-    31: .ORG 0x00
+    18: .DEF COUNTER = r20
+    19: 
+    20: ;========================================;
+    21: ;                LABELS                  ;
+    22: ;========================================;
+    23: 
+    24: .EQU LED_POWER_PORT   = PD6
+    25: .EQU CLOCK_PIN        = PB0   ; ST_CP on 74HC595
+    26: .EQU LATCH_PIN        = PB1   ; SH_CP on 74HC595
+    27: .EQU DATA_PIN         = PB2   ; DS on 74HC595
+    28: 
+    29: ;========================================;
+    30: ;              CODE SEGMENT              ;
+    31: ;========================================;
     32: 
-    33: ;========================================;
-    34: ;                VECTORS                 ;
-    35: ;========================================;
-    36: 
-    37: 000000   C014  rjmp 	RESET_vect			      ; Program start at RESET vector
-    38: 000001   9518  reti                        ; External Interrupt Request 0 / inactive
-    39: 000002   9518  reti		                    ; External Interrupt Request 1 / inactive
-    40: 000003   9518  reti                        ; Timer/Counter1 Capture Event / inactive
-    41: 000004   9518  reti		                    ; Timer/Counter1 Compare Match A / inactive
-    42: 000005   9518  reti                        ; Timer/Counter1 Overflow / inactive
-    43: 000006   9518  reti                        ; Timer/Counter0 Overflow / inactive
-    44: 000007   9518  reti                        ; USART0, Rx Complete / inactive
-    45: 000008   9518  reti                        ; USART0 Data Register Empty / inactive
-    46: 000009   9518  reti						            ; USART0, Tx Complete / inactive
-    47: 00000A   9518  reti                        ; Analog Comparator / inactive
-    48: 00000B   9518  reti	                      ; Pin Change Interrupt Request 0/ inactive
-    49: 00000C   9518  reti                        ; Timer/Counter1 Compare Match B / inactive
-    50: 00000D   9518  reti                        ; Timer/Counter0 Compare Match A / inactive
-    51: 00000E   9518  reti                        ; Timer/Counter0 Compare Match B / inactive
-    52: 00000F   9518  reti                        ; USI Start Condition/ inactive
-    53: 000010   9518  reti                        ; USI Overflow / inactive
-    54: 000011   9518  reti                        ; EEPROM Ready/ inactive
-    55: 000012   9518  reti                        ; Watchdog Timer Overflow / inactive
-    56: 000013   9518  reti                        ; Pin Change Interrupt Request 1 / inactive
-    57: 000014   9518  reti                        ; Pin Change Interrupt Request 2 / inactive
-    58: 
-    59: RESET_vect:
-    60:   ;
-    61:   ; INIT STACK POINTER
-    62: 000015   ED0F  ldi tmp_r_a, low(RAMEND)
-    63: 000016   BF0D  out SPL, tmp_r_a
-    64: 
-    65: MCU_INIT:
-    66: 000017   D001  rcall INIT_PORTS
-    67: 000018   C004  rjmp LOOP
+    33: .CSEG
+    34: .ORG 0x00
+    35: 
+    36: ;========================================;
+    37: ;                VECTORS                 ;
+    38: ;========================================;
+    39: 
+    40: 000000   C000  rjmp 	RESET_vect			      ; Program start at RESET vector
+    41: ;reti                        ; External Interrupt Request 0 / inactive
+    42: ;reti		                    ; External Interrupt Request 1 / inactive
+    43: ;reti                        ; Timer/Counter1 Capture Event / inactive
+    44: ;reti		                    ; Timer/Counter1 Compare Match A / inactive
+    45: ;reti                        ; Timer/Counter1 Overflow / inactive
+    46: ;reti                        ; Timer/Counter0 Overflow / inactive
+    47: ;reti                        ; USART0, Rx Complete / inactive
+    48: ;reti                        ; USART0 Data Register Empty / inactive
+    49: ;reti						            ; USART0, Tx Complete / inactive
+    50: ;reti                        ; Analog Comparator / inactive
+    51: ;reti	                      ; Pin Change Interrupt Request 0/ inactive
+    52: ;reti                        ; Timer/Counter1 Compare Match B / inactive
+    53: ;reti                        ; Timer/Counter0 Compare Match A / inactive
+    54: ;reti                        ; Timer/Counter0 Compare Match B / inactive
+    55: ;reti                        ; USI Start Condition/ inactive
+    56: ;reti                        ; USI Overflow / inactive
+    57: ;reti                        ; EEPROM Ready/ inactive
+    58: ;reti                        ; Watchdog Timer Overflow / inactive
+    59: ;reti                        ; Pin Change Interrupt Request 1 / inactive
+    60: ;reti                        ; Pin Change Interrupt Request 2 / inactive
+    61: 
+    62: RESET_vect:
+    63:   ;========================================;
+    64:   ;        INITIALIZE STACK POINTER        ;
+    65:   ;========================================;
+    66: 000001   ED0F  ldi       tmp_r_a, low(RAMEND)
+    67: 000002   BF0D  out       SPL, tmp_r_a
     68: 
-    69: INIT_PORTS:
-    70: 000019   E400  ldi r16, (1<<LED_POWER_PORT)
-    71: 00001A   BB01  out DDRD, r16
-    72: 00001B   BB02  out PORTD, r16
-    73: 00001C   9508  ret
-    74: 
-    75: ;========================================;
-    76: ;            MAIN PROGRAM LOOP           ;
-    77: ;========================================;
-    78: 
-    79: LOOP:
-    80: 00001D   E400  ldi r16, (1<<LED_POWER_PORT)
-    81: 00001E   BB02  out PORTD, r16
-    82: 
-    83: 00001F   D006  rcall DELAY
-    84: 000020   D005  rcall DELAY
+    69: MCU_INIT:
+    70:   ;=======================================================
+    71:   ;  POWER LED    <------------>   PD6                   ;
+    72:   ;    - This LED is used to indicate that device        ;
+    73:   ;       is working correctly                           ;
+    74:   ;                                                      ;
+    75:   ;=======================================================
+    76: 000003   D002  rcall     INIT_PORTS
+    77: 
+    78:   ;========================================;
+    79:   ;       USI IS USED TO COMMUNICATE       ;
+    80:   ;     WITH SHIFT REGISTER (74HC595N)     ;
+    81:   ;========================================;
+    82: 000004   D006  rcall     INIT_USI
+    83:   
+    84: 000005   C01D  rjmp      LOOP
     85: 
-    86: 000021   E000  ldi r16, (0<<LED_POWER_PORT)
-    87: 000022   BB02  out PORTD, r16
-    88: 
-    89: 000023   D002  rcall DELAY
-    90: 000024   D001  rcall DELAY
-    91: 
-    92: 000025   CFF7  rjmp LOOP
-    93: 
-    94: DELAY:
-    95: 000026   E302  ldi     r16, 50     ; 1 clock cycle
-    96:   _DEL_1:
-    97: 000027   EF1F  ldi   r17, 255    ; 1 clock cycle
-    98:   _DEL_2:
-    99: 000028   951A  dec   r17         ; 1 clock cycle
-   100: 000029   0000  nop               ; 1 clock cycle
-   101: 00002A   F7E9  brne  _DEL_2      ; 2 clock cycle when jumping / 1 when continue 
-   102: 
-   103: 00002B   950A  dec   r16         ; 1 clock cycle
-   104: 00002C   F7D1  brne  _DEL_1      ; 2 clock cycle when jumping / 1 when continue 
-   105: 00002D   9508  ret
-   106: 
-   107: INFO: .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
- -> Warning 004: Number of bytes on line is odd, added 00 to fit program memory!
-   File: /home/sergeyyarkov/Documents/Applications/attiny2313a_thermostat/firmware.asm, Line: 107
-   Source line: INFO: .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
-        00002E 5641 2052 4854 5245
-        000032 4F4D 5453 5441 202E
-        000036 5257 5449 4554 204E
-        00003A 5942 5320 5245 4547
-        00003E 2059 4159 4B52 564F
-        000042 3220 2E32 3130 322E
-        000046 3230 0033
-   108: 
-   109: ;========================================;
-   110: ;             EEPROM SEGMENT             ;
-   111: ;========================================;
-   112: 
-   113: .ESEG
+    86: INIT_PORTS:
+    87: 000006   E400  ldi       r16, (1<<LED_POWER_PORT)
+    88: 000007   BB01  out       DDRD, r16
+    89: 000008   E007  ldi       r16, (1<<CLOCK_PIN) | (1<<LATCH_PIN) | (1<<DATA_PIN)
+    90: 000009   BB07  out       DDRB, r16
+    91: 00000A   9508  ret
+    92: 
+    93: INIT_USI:
+    94: 
+    95: 00000B   9508  ret
+    96: 
+    97: CLOCK_595:
+    98: 00000C   930F  push      r16
+    99: 00000D   E001  ldi       r16,  (1<<CLOCK_PIN)
+   100: 00000E   B318  in        r17,  PORTB
+   101: 00000F   2710  eor       r17,  r16
+   102: 000010   BB18  out       PORTB, r17
+   103: 000011   910F  pop       r16
+   104: 000012   9508  ret
+   105: 
+   106: TRANSMIT_595:
+   107: 000013   933F  push      r19
+   108: 000014   E23A  ldi       r19, 0b00101010 ; Data to transmit
+   109: 000015   E008  ldi       r16, 8
+   110:   _TRANSMIT_595_LOOP:
+   111: 000016   0F33  lsl     r19
+   112: 000017   F410  brcc    _TRANSMIT_595_SEND_LOW
+   113: 000018   F000  brcs    _TRANSMIT_595_SEND_HIGH
+   114:     
+   115:     _TRANSMIT_595_SEND_HIGH:
+   116: 000019   C000  rjmp    _TRANSMIT_595_PROCEED
+   117:       
+   118: 
+   119:     _TRANSMIT_595_SEND_LOW:
+   120: 
+   121:     _TRANSMIT_595_PROCEED:
+   122: 00001A   DFF1  rcall    CLOCK_595
+   123: 00001B   DFF0  rcall    CLOCK_595
+   124: 00001C   950A  dec     r16
+   125: 00001D   F7C1  brne _TRANSMIT_595_LOOP
+   126: 00001E   913F  pop       r19
+   127: 00001F   9508  ret
+   128: 
+   129: SUBPROGRAM_LED_SHIFTING:
+   130: 000020   9543  inc       COUNTER
+   131: 000021   DFF1  rcall     TRANSMIT_595
+   132: 000022   9508  ret
+   133: 
+   134: ;========================================;
+   135: ;            MAIN PROGRAM LOOP           ;
+   136: ;========================================;
+   137: 
+   138: LOOP:
+   139: 000023   D00F  rcall     TOGGLE_POWER_LED
+   140: 000024   DFFB  rcall     SUBPROGRAM_LED_SHIFTING
+   141: 000025   D001  rcall     DELAY
+   142: 000026   CFFC  rjmp      LOOP
+   143: 
+   144: DELAY:
+   145: 000027   94F8  cli
+   146: 000028   E00A  ldi       r16, 10    ; 1
+   147:   _DELAY_1:
+   148: 000029   EF1F  ldi     r17, 255    ; 1
+   149:   _DELAY_2:
+   150: 00002A   951A  dec     r17         ; 1
+   151: 00002B   0000  nop                 ; 1
+   152: 00002C   0000  nop                 ; 1
+   153: 00002D   0000  nop                 ; 1
+   154: 00002E   F7D9  brne    _DELAY_2    ; 2/1
+   155: 
+   156: 00002F   950A  dec     r16
+   157: 000030   F7C1  brne    _DELAY_1    ; 2/1
+   158: 000031   9478  sei
+   159: 000032   9508  ret                     ; 4
+   160: 
+   161: TOGGLE_POWER_LED:
+   162: 000033   E400  ldi       r16,  (1<<LED_POWER_PORT)
+   163: 000034   B312  in        r17,  PORTD
+   164: 000035   2710  eor       r17,  r16
+   165: 000036   BB12  out       PORTD, r17
+   166: 000037   9508  ret
+   167: 
+   168: 
+   169: ;========================================;
+   170: ;             EEPROM SEGMENT             ;
+   171: ;========================================;
+   172: 
+   173: .ESEG
+   174: INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+        000000 41 56 52 20 54 48 45 52
+        000008 4D 4F 53 54 41 54 2E 20
+        000010 57 52 49 54 54 45 4E 20
+        000018 42 59 20 53 45 52 47 45
+        000020 59 20 59 41 52 4B 4F 56
+        000028 20 32 32 2E 30 31 2E 32
+        000030 30 32 33
 
 List of symbols:
 Type nDef nUsed             Decimalval           Hexval Name
   T     1     1                     89               59 ATTINY2313A
-  L     1     2                     21               15 RESET_VECT
-  L     1     0                     23               17 MCU_INIT
-  L     1     2                     25               19 INIT_PORTS
-  L     1     4                     29               1D LOOP
-  L     1     8                     38               26 DELAY
-  L     1     2                     39               27 _DEL_1
-  L     1     2                     40               28 _DEL_2
-  L     1     0                     46               2E INFO
+  L     1     2                      1               01 RESET_VECT
+  L     1     0                      3               03 MCU_INIT
+  L     1     2                      6               06 INIT_PORTS
+  L     1     2                     11               0B INIT_USI
+  L     1     4                     12               0C CLOCK_595
+  L     1     2                     19               13 TRANSMIT_595
+  L     1     2                     22               16 _TRANSMIT_595_LOOP
+  L     1     2                     25               19 _TRANSMIT_595_SEND_HIGH
+  L     1     2                     26               1A _TRANSMIT_595_SEND_LOW
+  L     1     2                     26               1A _TRANSMIT_595_PROCEED
+  L     1     2                     32               20 SUBPROGRAM_LED_SHIFTING
+  L     1     4                     35               23 LOOP
+  L     1     2                     39               27 DELAY
+  L     1     2                     41               29 _DELAY_1
+  L     1     2                     42               2A _DELAY_2
+  L     1     2                     51               33 TOGGLE_POWER_LED
+  L     1     0                      0               00 INFO
   R     1     2                     16               10 TMP_R_A
+  R     1     1                     20               14 COUNTER
   C     1     0                     23               17 NOW_Y
   C     1     0                      1               01 NOW_M
-  C     1     0                     24               18 NOW_D
-  C     1     0                  44950             AF96 NOW_I
-  C     1     3                      6               06 LED_POWER_PORT
+  C     1     0                     28               1C NOW_D
+  C     1     0                  44954             AF9A NOW_I
+  C     1     2                      6               06 LED_POWER_PORT
+  C     1     2                      0               00 CLOCK_PIN
+  C     1     1                      1               01 LATCH_PIN
+  C     1     1                      2               02 DATA_PIN
    No macros.
 
-Program             :       46 words.
-Constants           :       26 words.
-Total program memory:       72 words.
-Eeprom space        :        0 bytes.
+Program             :       56 words.
+Constants           :        0 words.
+Total program memory:       56 words.
+Eeprom space        :       51 bytes.
 Data segment        :        0 bytes.
 Compilation completed, no errors.
-Compilation ended 24.01.2023, 01:15:04
+Compilation ended 28.01.2023, 02:47:03

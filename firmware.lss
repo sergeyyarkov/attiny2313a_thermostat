@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  firmware.asm Tue Jan 24 01:18:37 2023
+AVRASM ver. 2.2.7  firmware.asm Sat Jan 28 03:33:17 2023
 
 firmware.asm(14): Including file 'tn2313Adef.inc'
 firmware.asm(14): Including file 'tn2313Adef.inc'
@@ -719,13 +719,16 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  .LIST
                                  
                                  .DEF tmp_r_a = r16
+                                 .DEF COUNTER = r20
                                  
                                  ;========================================;
                                  ;                LABELS                  ;
                                  ;========================================;
                                  
-                                 .EQU LED_POWER_PORT = PD6
-                                 
+                                 .EQU LED_POWER_PORT   = PD6
+                                 .EQU CLOCK_PIN        = PB0   ; ST_CP on 74HC595
+                                 .EQU DATA_PIN         = PB1   ; DS on 74HC595
+                                 .EQU LATCH_PIN        = PB2   ; SH_CP on 74HC595
                                  
                                  ;========================================;
                                  ;              CODE SEGMENT              ;
@@ -738,108 +741,193 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ;                VECTORS                 ;
                                  ;========================================;
                                  
-000000 c014                      rjmp 	RESET_vect			      ; Program start at RESET vector
-000001 9518                      reti                        ; External Interrupt Request 0 / inactive
-000002 9518                      reti		                    ; External Interrupt Request 1 / inactive
-000003 9518                      reti                        ; Timer/Counter1 Capture Event / inactive
-000004 9518                      reti		                    ; Timer/Counter1 Compare Match A / inactive
-000005 9518                      reti                        ; Timer/Counter1 Overflow / inactive
-000006 9518                      reti                        ; Timer/Counter0 Overflow / inactive
-000007 9518                      reti                        ; USART0, Rx Complete / inactive
-000008 9518                      reti                        ; USART0 Data Register Empty / inactive
-000009 9518                      reti						            ; USART0, Tx Complete / inactive
-00000a 9518                      reti                        ; Analog Comparator / inactive
-00000b 9518                      reti	                      ; Pin Change Interrupt Request 0/ inactive
-00000c 9518                      reti                        ; Timer/Counter1 Compare Match B / inactive
-00000d 9518                      reti                        ; Timer/Counter0 Compare Match A / inactive
-00000e 9518                      reti                        ; Timer/Counter0 Compare Match B / inactive
-00000f 9518                      reti                        ; USI Start Condition/ inactive
-000010 9518                      reti                        ; USI Overflow / inactive
-000011 9518                      reti                        ; EEPROM Ready/ inactive
-000012 9518                      reti                        ; Watchdog Timer Overflow / inactive
-000013 9518                      reti                        ; Pin Change Interrupt Request 1 / inactive
-000014 9518                      reti                        ; Pin Change Interrupt Request 2 / inactive
+000000 c000                      rjmp 	RESET_vect			      ; Program start at RESET vector
+                                 ;reti                        ; External Interrupt Request 0 / inactive
+                                 ;reti		                    ; External Interrupt Request 1 / inactive
+                                 ;reti                        ; Timer/Counter1 Capture Event / inactive
+                                 ;reti		                    ; Timer/Counter1 Compare Match A / inactive
+                                 ;reti                        ; Timer/Counter1 Overflow / inactive
+                                 ;reti                        ; Timer/Counter0 Overflow / inactive
+                                 ;reti                        ; USART0, Rx Complete / inactive
+                                 ;reti                        ; USART0 Data Register Empty / inactive
+                                 ;reti						            ; USART0, Tx Complete / inactive
+                                 ;reti                        ; Analog Comparator / inactive
+                                 ;reti	                      ; Pin Change Interrupt Request 0/ inactive
+                                 ;reti                        ; Timer/Counter1 Compare Match B / inactive
+                                 ;reti                        ; Timer/Counter0 Compare Match A / inactive
+                                 ;reti                        ; Timer/Counter0 Compare Match B / inactive
+                                 ;reti                        ; USI Start Condition/ inactive
+                                 ;reti                        ; USI Overflow / inactive
+                                 ;reti                        ; EEPROM Ready/ inactive
+                                 ;reti                        ; Watchdog Timer Overflow / inactive
+                                 ;reti                        ; Pin Change Interrupt Request 1 / inactive
+                                 ;reti                        ; Pin Change Interrupt Request 2 / inactive
                                  
                                  RESET_vect:
-                                   ;
-                                   ; INIT STACK POINTER
-000015 ed0f                        ldi tmp_r_a, low(RAMEND)
-000016 bf0d                        out SPL, tmp_r_a
+                                   ;========================================;
+                                   ;        INITIALIZE STACK POINTER        ;
+                                   ;========================================;
+000001 ed0f                        ldi       tmp_r_a, low(RAMEND)
+000002 bf0d                        out       SPL, tmp_r_a
                                  
                                  MCU_INIT:
-000017 d001                        rcall INIT_PORTS
-000018 c004                        rjmp LOOP
+                                   ;=======================================================
+                                   ;  POWER LED    <------------>   PD6                   ;
+                                   ;    - This LED is used to indicate that device        ;
+                                   ;       is working correctly                           ;
+                                   ;                                                      ;
+                                   ;=======================================================
+000003 d003                        rcall     INIT_PORTS
+                                 
+                                   ;========================================;
+                                   ;       USI IS USED TO COMMUNICATE       ;
+                                   ;     WITH SHIFT REGISTER (74HC595N)     ;
+                                   ;========================================;
+000004 d007                        rcall     INIT_USI
+                                 
+000005 e040                        ldi       COUNTER, 0
+000006 c01a                        rjmp      LOOP
                                  
                                  INIT_PORTS:
-000019 e400                        ldi r16, (1<<LED_POWER_PORT)
-00001a bb01                        out DDRD, r16
-00001b bb02                        out PORTD, r16
-00001c 9508                      ret
+000007 e400                        ldi       r16, (1<<LED_POWER_PORT)
+000008 bb01                        out       DDRD, r16
+000009 e007                        ldi       r16, (1<<CLOCK_PIN) | (1<<LATCH_PIN) | (1<<DATA_PIN)
+00000a bb07                        out       DDRB, r16
+00000b 9508                      ret
+                                 
+                                 INIT_USI:
+                                 
+00000c 9508                      ret
+                                 
+                                 ;========================================;
+                                 ;          SEND BYTE TO 74HC595          ;
+                                 ;========================================;
+                                 TRANSMIT_595:
+00000d 933f                        push      r19
+00000e 2f34                        mov       r19, COUNTER
+00000f e008                        ldi       r16, 8
+                                   _TRANSMIT_595_LOOP:
+000010 0f33                          lsl     r19
+000011 f418                          brcc    _TRANSMIT_595_SEND_LOW
+000012 f000                          brcs    _TRANSMIT_595_SEND_HIGH
+                                     
+                                     _TRANSMIT_595_SEND_HIGH:
+000013 9ac1                            sbi     PORTB, DATA_PIN
+000014 c001                            rjmp    _TRANSMIT_595_COMMIT
+                                 
+                                     _TRANSMIT_595_SEND_LOW:
+000015 98c1                            cbi     PORTB, DATA_PIN
+                                 
+                                     _TRANSMIT_595_COMMIT:
+000016 9ac0                            sbi      PORTB, CLOCK_PIN
+000017 98c0                            cbi      PORTB, CLOCK_PIN
+000018 9ac2                            sbi      PORTB, LATCH_PIN
+000019 98c2                            cbi      PORTB, LATCH_PIN 
+00001a 950a                          dec      r16
+00001b f7a1                          brne     _TRANSMIT_595_LOOP
+00001c 913f                        pop        r19
+00001d 9508                      ret
+                                 
+                                 SUBPROGRAM_LED_SHIFTING:
+00001e dfee                        rcall     TRANSMIT_595
+00001f 9543                        inc       COUNTER
+000020 9508                      ret
                                  
                                  ;========================================;
                                  ;            MAIN PROGRAM LOOP           ;
                                  ;========================================;
                                  
                                  LOOP:
-00001d e400                        ldi r16, (1<<LED_POWER_PORT)
-00001e bb02                        out PORTD, r16
-                                 
-00001f d006                        rcall DELAY
-000020 d005                        rcall DELAY
-                                 
-000021 e000                        ldi r16, (0<<LED_POWER_PORT)
-000022 bb02                        out PORTD, r16
-                                 
-000023 d002                        rcall DELAY
-000024 d001                        rcall DELAY
-                                 
-000025 cff7                        rjmp LOOP
+000021 d013                        rcall     TOGGLE_POWER_LED
+000022 dffb                        rcall     SUBPROGRAM_LED_SHIFTING
+000023 d001                        rcall     DELAY
+000024 cffc                        rjmp      LOOP
                                  
                                  DELAY:
-000026 ef0f                        ldi     r16, 255     ; 1 clock cycle
-                                   _DEL_1:
-000027 ef1f                          ldi   r17, 255    ; 1 clock cycle
-                                   _DEL_2:
-000028 951a                          dec   r17         ; 1 clock cycle
-000029 0000                          nop               ; 1 clock cycle
-00002a f7e9                          brne  _DEL_2      ; 2 clock cycle when jumping / 1 when continue 
+000025 930f                        push      r16
+000026 931f                        push      r17
+000027 94f8                        cli
+000028 e104                        ldi       r16, 20    ; 1
+                                   _DELAY_1:
+000029 ef1f                          ldi     r17, 255   
+                                   _DELAY_2:
+00002a 951a                          dec     r17         
+00002b 0000                          nop                 
+00002c 0000                          nop                
+00002d 0000                          nop                 
+00002e f7d9                          brne    _DELAY_2    
                                  
-00002b 950a                          dec   r16         ; 1 clock cycle
-00002c f7d1                          brne  _DEL_1      ; 2 clock cycle when jumping / 1 when continue 
-00002d 9508                      ret
+00002f 950a                          dec     r16
+000030 f7c1                          brne    _DELAY_1    
+000031 9478                        sei
                                  
-00002e 5641
-00002f 2052
-000030 6854
-000031 7265
-000032 6f6d
-000033 7473
-000034 7461
-000035 202e
-000036 7257
-000037 7469
-000038 6574
-000039 206e
-00003a 7962
-00003b 5320
-00003c 7265
-00003d 6567
-00003e 2079
-00003f 6159
-000040 6b72
-000041 766f
-000042 3220
-000043 2e32
-000044 3130
-000045 322e
-000046 3230
-firmware.asm(107): warning: .cseg .db misalignment - padding zero byte
-000047 0033                      INFO: .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+000032 911f                        pop       r17
+000033 910f                        pop       r16
+000034 9508                      ret                    
+                                 
+                                 TOGGLE_POWER_LED:
+000035 e400                        ldi       r16,  (1<<LED_POWER_PORT)
+000036 b312                        in        r17,  PORTD
+000037 2710                        eor       r17,  r16
+000038 bb12                        out       PORTD, r17
+000039 9508                      ret
+                                 
                                  
                                  ;========================================;
                                  ;             EEPROM SEGMENT             ;
                                  ;========================================;
                                  
+                                 .ESEG
+000000 41
+000001 56
+000002 52
+000003 20
+000004 54
+000005 68
+000006 65
+000007 72
+000008 6d
+000009 6f
+00000a 73
+00000b 74
+00000c 61
+00000d 74
+00000e 2e
+00000f 20
+000010 57
+000011 72
+000012 69
+000013 74
+000014 74
+000015 65
+000016 6e
+000017 20
+000018 62
+000019 79
+00001a 20
+00001b 53
+00001c 65
+00001d 72
+00001e 67
+00001f 65
+000020 79
+000021 20
+000022 59
+000023 61
+000024 72
+000025 6b
+000026 6f
+000027 76
+000028 20
+000029 32
+00002a 32
+00002b 2e
+00002c 30
+00002d 31
+00002e 2e
+00002f 32
+000030 30
+000031 32
 
 
 RESOURCE USE INFORMATION
@@ -859,37 +947,37 @@ counted separately from r26..r31 here.
 "ATtiny2313A" register use summary:
 x  :   0 y  :   0 z  :   0 r0 :   0 r1 :   0 r2 :   0 r3 :   0 r4 :   0 
 r5 :   0 r6 :   0 r7 :   0 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 
-r13:   0 r14:   0 r15:   0 r16:  11 r17:   2 r18:   0 r19:   0 r20:   0 
+r13:   0 r14:   0 r15:   0 r16:  14 r17:   7 r18:   0 r19:   4 r20:   3 
 r21:   0 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
 r29:   0 r30:   0 r31:   0 
-Registers used: 2 out of 35 (5.7%)
+Registers used: 4 out of 35 (11.4%)
 
 "ATtiny2313A" instruction use summary:
 .lds  :   0 .sts  :   0 adc   :   0 add   :   0 adiw  :   0 and   :   0 
 andi  :   0 asr   :   0 bclr  :   0 bld   :   0 brbc  :   0 brbs  :   0 
-brcc  :   0 brcs  :   0 break :   0 breq  :   0 brge  :   0 brhc  :   0 
+brcc  :   1 brcs  :   1 break :   0 breq  :   0 brge  :   0 brhc  :   0 
 brhs  :   0 brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 
-brne  :   2 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0 
-brvs  :   0 bset  :   0 bst   :   0 cbi   :   0 cbr   :   0 clc   :   0 
-clh   :   0 cli   :   0 cln   :   0 clr   :   0 cls   :   0 clt   :   0 
+brne  :   3 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0 
+brvs  :   0 bset  :   0 bst   :   0 cbi   :   3 cbr   :   0 clc   :   0 
+clh   :   0 cli   :   1 cln   :   0 clr   :   0 cls   :   0 clt   :   0 
 clv   :   0 clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   0 
-cpse  :   0 dec   :   2 eor   :   0 icall :   0 ijmp  :   0 in    :   0 
-inc   :   0 ld    :   0 ldd   :   0 ldi   :   6 lds   :   0 lpm   :   0 
-lsl   :   0 lsr   :   0 mov   :   0 movw  :   0 neg   :   0 nop   :   1 
-or    :   0 ori   :   0 out   :   5 pop   :   0 push  :   0 rcall :   5 
-ret   :   2 reti  :  20 rjmp  :   3 rol   :   0 ror   :   0 sbc   :   0 
-sbci  :   0 sbi   :   0 sbic  :   0 sbis  :   0 sbiw  :   0 sbr   :   0 
-sbrc  :   0 sbrs  :   0 sec   :   0 seh   :   0 sei   :   0 sen   :   0 
+cpse  :   0 dec   :   3 eor   :   1 icall :   0 ijmp  :   0 in    :   1 
+inc   :   1 ld    :   0 ldd   :   0 ldi   :   8 lds   :   0 lpm   :   0 
+lsl   :   1 lsr   :   0 mov   :   1 movw  :   0 neg   :   0 nop   :   3 
+or    :   0 ori   :   0 out   :   4 pop   :   3 push  :   3 rcall :   6 
+ret   :   6 reti  :   0 rjmp  :   4 rol   :   0 ror   :   0 sbc   :   0 
+sbci  :   0 sbi   :   3 sbic  :   0 sbis  :   0 sbiw  :   0 sbr   :   0 
+sbrc  :   0 sbrs  :   0 sec   :   0 seh   :   0 sei   :   1 sen   :   0 
 ser   :   0 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 
 spm   :   0 st    :   0 std   :   0 sts   :   0 sub   :   0 subi  :   0 
 swap  :   0 tst   :   0 wdr   :   0 
-Instructions used: 9 out of 105 (8.6%)
+Instructions used: 21 out of 105 (20.0%)
 
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x000090     92     52    144    2048   7.0%
+[.cseg] 0x000000 0x000074    116      0    116    2048   5.7%
 [.dseg] 0x000060 0x000060      0      0      0     128   0.0%
-[.eseg] 0x000000 0x000000      0      0      0     128   0.0%
+[.eseg] 0x000000 0x000033      0     51     51     128  39.8%
 
-Assembly complete, 0 errors, 1 warnings
+Assembly complete, 0 errors, 0 warnings
