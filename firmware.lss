@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  firmware.asm Sat Jan 28 03:33:17 2023
+AVRASM ver. 2.2.7  firmware.asm Sun Jan 29 21:32:32 2023
 
 firmware.asm(14): Including file 'tn2313Adef.inc'
 firmware.asm(14): Including file 'tn2313Adef.inc'
@@ -12,8 +12,8 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ; Device Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/doc8246.pdf
                                  ; Package: SOIC-20W_7.5x12.8mm_P1.27mm
                                  ; Assembler: AVR macro assembler 2.2.7
-                                 ; Clock frequency: 12 MHz External Crystal Oscillator
-                                 ; Fuses: lfuse: 0x4F, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
+                                 ; Clock frequency: 8 MHz External Crystal Oscillator
+                                 ; Fuses: lfuse: 0xCF, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
                                  ;
                                  ; Written by Sergey Yarkov 22.01.2023
                                  
@@ -718,8 +718,9 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ; ***** END OF FILE ******************************************************
                                  .LIST
                                  
-                                 .DEF tmp_r_a = r16
-                                 .DEF COUNTER = r20
+                                 .DEF TEMP_REG_A       = r16
+                                 .DEF TEMP_REG_B       = r17
+                                 .DEF COUNTER          = r20
                                  
                                  ;========================================;
                                  ;                LABELS                  ;
@@ -767,8 +768,8 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                    ;========================================;
                                    ;        INITIALIZE STACK POINTER        ;
                                    ;========================================;
-000001 ed0f                        ldi       tmp_r_a, low(RAMEND)
-000002 bf0d                        out       SPL, tmp_r_a
+000001 ed0f                        ldi       TEMP_REG_A, low(RAMEND)
+000002 bf0d                        out       SPL, TEMP_REG_A
                                  
                                  MCU_INIT:
                                    ;=======================================================
@@ -785,7 +786,7 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                    ;========================================;
 000004 d007                        rcall     INIT_USI
                                  
-000005 e040                        ldi       COUNTER, 0
+000005 e041                        ldi       COUNTER, 0b00000001
 000006 c01a                        rjmp      LOOP
                                  
                                  INIT_PORTS:
@@ -803,10 +804,12 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ;          SEND BYTE TO 74HC595          ;
                                  ;========================================;
                                  TRANSMIT_595:
-00000d 933f                        push      r19
+00000d b75f                        in        r21, SREG
 00000e 2f34                        mov       r19, COUNTER
-00000f e008                        ldi       r16, 8
+00000f e018                        ldi       TEMP_REG_B, 8
                                    _TRANSMIT_595_LOOP:
+                                     ;
+                                     ; Shift a bit into the Carry flag and check if it is set to 1 or 0.
 000010 0f33                          lsl     r19
 000011 f418                          brcc    _TRANSMIT_595_SEND_LOW
 000012 f000                          brcs    _TRANSMIT_595_SEND_HIGH
@@ -819,18 +822,21 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
 000015 98c1                            cbi     PORTB, DATA_PIN
                                  
                                      _TRANSMIT_595_COMMIT:
-000016 9ac0                            sbi      PORTB, CLOCK_PIN
-000017 98c0                            cbi      PORTB, CLOCK_PIN
-000018 9ac2                            sbi      PORTB, LATCH_PIN
-000019 98c2                            cbi      PORTB, LATCH_PIN 
-00001a 950a                          dec      r16
-00001b f7a1                          brne     _TRANSMIT_595_LOOP
-00001c 913f                        pop        r19
+000016 98c0                            cbi      PORTB, CLOCK_PIN
+000017 9ac0                            sbi      PORTB, CLOCK_PIN
+000018 951a                          dec      TEMP_REG_B
+000019 f7b1                          brne     _TRANSMIT_595_LOOP
+                                     
+                                     ;
+                                     ; Copy data from shift register to storage register
+00001a 9ac2                          sbi      PORTB, LATCH_PIN
+00001b 98c2                          cbi      PORTB, LATCH_PIN 
+00001c bf5f                        out        SREG, r21
 00001d 9508                      ret
                                  
                                  SUBPROGRAM_LED_SHIFTING:
 00001e dfee                        rcall     TRANSMIT_595
-00001f 9543                        inc       COUNTER
+00001f 1f44                        rol       COUNTER
 000020 9508                      ret
                                  
                                  ;========================================;
@@ -838,39 +844,40 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ;========================================;
                                  
                                  LOOP:
-000021 d013                        rcall     TOGGLE_POWER_LED
+000021 d014                        rcall     TOGGLE_POWER_LED
 000022 dffb                        rcall     SUBPROGRAM_LED_SHIFTING
-000023 d001                        rcall     DELAY
-000024 cffc                        rjmp      LOOP
+000023 d002                        rcall     DELAY
+000024 d001                        rcall     DELAY
+000025 cffb                        rjmp      LOOP
                                  
                                  DELAY:
-000025 930f                        push      r16
-000026 931f                        push      r17
-000027 94f8                        cli
-000028 e104                        ldi       r16, 20    ; 1
+000026 930f                        push      r16
+000027 931f                        push      r17
+000028 94f8                        cli
+000029 ef0f                        ldi       r16, 255
                                    _DELAY_1:
-000029 ef1f                          ldi     r17, 255   
+00002a ef1f                          ldi     r17, 255   
                                    _DELAY_2:
-00002a 951a                          dec     r17         
-00002b 0000                          nop                 
-00002c 0000                          nop                
-00002d 0000                          nop                 
-00002e f7d9                          brne    _DELAY_2    
+00002b 951a                          dec     r17         
+00002c 0000                          nop                 
+00002d 0000                          nop                
+00002e 0000                          nop                 
+00002f f7d9                          brne    _DELAY_2    
                                  
-00002f 950a                          dec     r16
-000030 f7c1                          brne    _DELAY_1    
-000031 9478                        sei
+000030 950a                          dec     r16
+000031 f7c1                          brne    _DELAY_1    
+000032 9478                        sei
                                  
-000032 911f                        pop       r17
-000033 910f                        pop       r16
-000034 9508                      ret                    
+000033 911f                        pop       r17
+000034 910f                        pop       r16
+000035 9508                      ret                    
                                  
                                  TOGGLE_POWER_LED:
-000035 e400                        ldi       r16,  (1<<LED_POWER_PORT)
-000036 b312                        in        r17,  PORTD
-000037 2710                        eor       r17,  r16
-000038 bb12                        out       PORTD, r17
-000039 9508                      ret
+000036 e400                        ldi       r16,  (1<<LED_POWER_PORT)
+000037 b312                        in        r17,  PORTD
+000038 2710                        eor       r17,  r16
+000039 bb12                        out       PORTD, r17
+00003a 9508                      ret
                                  
                                  
                                  ;========================================;
@@ -947,10 +954,10 @@ counted separately from r26..r31 here.
 "ATtiny2313A" register use summary:
 x  :   0 y  :   0 z  :   0 r0 :   0 r1 :   0 r2 :   0 r3 :   0 r4 :   0 
 r5 :   0 r6 :   0 r7 :   0 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 
-r13:   0 r14:   0 r15:   0 r16:  14 r17:   7 r18:   0 r19:   4 r20:   3 
-r21:   0 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
+r13:   0 r14:   0 r15:   0 r16:  12 r17:   9 r18:   0 r19:   2 r20:   3 
+r21:   2 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
 r29:   0 r30:   0 r31:   0 
-Registers used: 4 out of 35 (11.4%)
+Registers used: 5 out of 35 (14.3%)
 
 "ATtiny2313A" instruction use summary:
 .lds  :   0 .sts  :   0 adc   :   0 add   :   0 adiw  :   0 and   :   0 
@@ -961,11 +968,11 @@ brne  :   3 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0
 brvs  :   0 bset  :   0 bst   :   0 cbi   :   3 cbr   :   0 clc   :   0 
 clh   :   0 cli   :   1 cln   :   0 clr   :   0 cls   :   0 clt   :   0 
 clv   :   0 clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   0 
-cpse  :   0 dec   :   3 eor   :   1 icall :   0 ijmp  :   0 in    :   1 
-inc   :   1 ld    :   0 ldd   :   0 ldi   :   8 lds   :   0 lpm   :   0 
+cpse  :   0 dec   :   3 eor   :   1 icall :   0 ijmp  :   0 in    :   2 
+inc   :   0 ld    :   0 ldd   :   0 ldi   :   8 lds   :   0 lpm   :   0 
 lsl   :   1 lsr   :   0 mov   :   1 movw  :   0 neg   :   0 nop   :   3 
-or    :   0 ori   :   0 out   :   4 pop   :   3 push  :   3 rcall :   6 
-ret   :   6 reti  :   0 rjmp  :   4 rol   :   0 ror   :   0 sbc   :   0 
+or    :   0 ori   :   0 out   :   5 pop   :   2 push  :   2 rcall :   7 
+ret   :   6 reti  :   0 rjmp  :   4 rol   :   1 ror   :   0 sbc   :   0 
 sbci  :   0 sbi   :   3 sbic  :   0 sbis  :   0 sbiw  :   0 sbr   :   0 
 sbrc  :   0 sbrs  :   0 sec   :   0 seh   :   0 sei   :   1 sen   :   0 
 ser   :   0 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 
@@ -976,7 +983,7 @@ Instructions used: 21 out of 105 (20.0%)
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x000074    116      0    116    2048   5.7%
+[.cseg] 0x000000 0x000076    118      0    118    2048   5.8%
 [.dseg] 0x000060 0x000060      0      0      0     128   0.0%
 [.eseg] 0x000000 0x000033      0     51     51     128  39.8%
 

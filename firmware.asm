@@ -6,16 +6,17 @@
 ; Device Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/doc8246.pdf
 ; Package: SOIC-20W_7.5x12.8mm_P1.27mm
 ; Assembler: AVR macro assembler 2.2.7
-; Clock frequency: 12 MHz External Crystal Oscillator
-; Fuses: lfuse: 0x4F, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
+; Clock frequency: 8 MHz External Crystal Oscillator
+; Fuses: lfuse: 0xCF, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
 ;
 ; Written by Sergey Yarkov 22.01.2023
 
 .INCLUDE "tn2313Adef.inc"
 .LIST
 
-.DEF tmp_r_a = r16
-.DEF COUNTER = r20
+.DEF TEMP_REG_A       = r16
+.DEF TEMP_REG_B       = r17
+.DEF COUNTER          = r20
 
 ;========================================;
 ;                LABELS                  ;
@@ -63,8 +64,8 @@ RESET_vect:
   ;========================================;
   ;        INITIALIZE STACK POINTER        ;
   ;========================================;
-  ldi       tmp_r_a, low(RAMEND)
-  out       SPL, tmp_r_a
+  ldi       TEMP_REG_A, low(RAMEND)
+  out       SPL, TEMP_REG_A
 
 MCU_INIT:
   ;=======================================================
@@ -81,7 +82,7 @@ MCU_INIT:
   ;========================================;
   rcall     INIT_USI
 
-  ldi       COUNTER, 0
+  ldi       COUNTER, 0b00000001
   rjmp      LOOP
 
 INIT_PORTS:
@@ -99,10 +100,12 @@ ret
 ;          SEND BYTE TO 74HC595          ;
 ;========================================;
 TRANSMIT_595:
-  push      r19
+  in        r21, SREG
   mov       r19, COUNTER
-  ldi       r16, 8
+  ldi       TEMP_REG_B, 8
   _TRANSMIT_595_LOOP:
+    ;
+    ; Shift a bit into the Carry flag and check if it is set to 1 or 0.
     lsl     r19
     brcc    _TRANSMIT_595_SEND_LOW
     brcs    _TRANSMIT_595_SEND_HIGH
@@ -115,18 +118,21 @@ TRANSMIT_595:
       cbi     PORTB, DATA_PIN
 
     _TRANSMIT_595_COMMIT:
-      sbi      PORTB, CLOCK_PIN
       cbi      PORTB, CLOCK_PIN
-      sbi      PORTB, LATCH_PIN
-      cbi      PORTB, LATCH_PIN 
-    dec      r16
+      sbi      PORTB, CLOCK_PIN
+    dec      TEMP_REG_B
     brne     _TRANSMIT_595_LOOP
-  pop        r19
+    
+    ;
+    ; Copy data from shift register to storage register
+    sbi      PORTB, LATCH_PIN
+    cbi      PORTB, LATCH_PIN 
+  out        SREG, r21
 ret
 
 SUBPROGRAM_LED_SHIFTING:
   rcall     TRANSMIT_595
-  inc       COUNTER
+  rol       COUNTER
 ret
 
 ;========================================;
@@ -137,13 +143,14 @@ LOOP:
   rcall     TOGGLE_POWER_LED
   rcall     SUBPROGRAM_LED_SHIFTING
   rcall     DELAY
+  rcall     DELAY
   rjmp      LOOP
 
 DELAY:
   push      r16
   push      r17
   cli
-  ldi       r16, 20    ; 1
+  ldi       r16, 255
   _DELAY_1:
     ldi     r17, 255   
   _DELAY_2:
