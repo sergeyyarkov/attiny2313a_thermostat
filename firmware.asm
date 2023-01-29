@@ -23,9 +23,9 @@
 ;========================================;
 
 .EQU LED_POWER_PORT   = PD6
-.EQU CLOCK_PIN        = PB0   ; ST_CP on 74HC595
-.EQU DATA_PIN         = PB1   ; DS on 74HC595
-.EQU LATCH_PIN        = PB2   ; SH_CP on 74HC595
+.EQU USI_LATCH_PIN    = PB0   ; ST_CP on 74HC595
+.EQU USI_DO_PIN       = PB6   ; DS on 74HC595
+.EQU USI_CLK_PIN      = PB7   ; SH_CP on 74HC595
 
 ;========================================;
 ;              CODE SEGMENT              ;
@@ -75,63 +75,40 @@ MCU_INIT:
   ;                                                      ;
   ;=======================================================
   rcall     INIT_PORTS
-
-  ;========================================;
-  ;       USI IS USED TO COMMUNICATE       ;
-  ;     WITH SHIFT REGISTER (74HC595N)     ;
-  ;========================================;
-  rcall     INIT_USI
-
   ldi       COUNTER, 0b00000001
   rjmp      LOOP
 
 INIT_PORTS:
   ldi       r16, (1<<LED_POWER_PORT)
   out       DDRD, r16
-  ldi       r16, (1<<CLOCK_PIN) | (1<<LATCH_PIN) | (1<<DATA_PIN)
+  ldi       r16, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN)
   out       DDRB, r16
-ret
-
-INIT_USI:
-
 ret
 
 ;========================================;
 ;          SEND BYTE TO 74HC595          ;
 ;========================================;
-TRANSMIT_595:
+
+USI_TRANSMIT_595:
   in        r21, SREG
   mov       r19, COUNTER
-  ldi       TEMP_REG_B, 8
-  _TRANSMIT_595_LOOP:
-    ;
-    ; Shift a bit into the Carry flag and check if it is set to 1 or 0.
-    lsl     r19
-    brcc    _TRANSMIT_595_SEND_LOW
-    brcs    _TRANSMIT_595_SEND_HIGH
-    
-    _TRANSMIT_595_SEND_HIGH:
-      sbi     PORTB, DATA_PIN
-      rjmp    _TRANSMIT_595_COMMIT
+  out       USIDR, r19
+  ldi       r19, (1<<USIOIF)
+  out       USISR, r19
+  ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
+  
+  _USI_TRANSMIT_595_LOOP:
+    out       USICR, TEMP_REG_A
+    sbis      USISR, USIOIF
+    rjmp      _USI_TRANSMIT_595_LOOP
 
-    _TRANSMIT_595_SEND_LOW:
-      cbi     PORTB, DATA_PIN
-
-    _TRANSMIT_595_COMMIT:
-      cbi      PORTB, CLOCK_PIN
-      sbi      PORTB, CLOCK_PIN
-    dec      TEMP_REG_B
-    brne     _TRANSMIT_595_LOOP
-    
-    ;
-    ; Copy data from shift register to storage register
-    sbi      PORTB, LATCH_PIN
-    cbi      PORTB, LATCH_PIN 
-  out        SREG, r21
+  sbi      PORTB, USI_LATCH_PIN
+  cbi      PORTB, USI_LATCH_PIN
+  out       SREG, r21
 ret
 
 SUBPROGRAM_LED_SHIFTING:
-  rcall     TRANSMIT_595
+  rcall     USI_TRANSMIT_595
   rol       COUNTER
 ret
 
