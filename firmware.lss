@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  firmware.asm Sun Jan 29 22:16:18 2023
+AVRASM ver. 2.2.7  firmware.asm Tue Jan 31 00:01:48 2023
 
 firmware.asm(14): Including file 'tn2313Adef.inc'
 firmware.asm(14): Including file 'tn2313Adef.inc'
@@ -780,7 +780,7 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                    ;=======================================================
 000003 d002                        rcall     INIT_PORTS
 000004 e041                        ldi       COUNTER, 0b00000001
-000005 c015                        rjmp      LOOP
+000005 c013                        rjmp      LOOP
                                  
                                  INIT_PORTS:
 000006 e400                        ldi       r16, (1<<LED_POWER_PORT)
@@ -793,68 +793,66 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ;          SEND BYTE TO 74HC595          ;
                                  ;========================================;
                                  
-                                 USI_TRANSMIT_595:
-00000b b75f                        in        r21, SREG
-00000c 2f34                        mov       r19, COUNTER
-00000d b93f                        out       USIDR, r19
-00000e e430                        ldi       r19, (1<<USIOIF)
-00000f b93e                        out       USISR, r19
-000010 e10b                        ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
+                                 USI_TRANSMIT:
+00000b 2f34                        mov       r19, COUNTER
+00000c b93f                        out       USIDR, r19
+00000d e430                        ldi       r19, (1<<USIOIF)
+00000e b93e                        out       USISR, r19
+00000f e10b                        ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
                                    
-                                   _USI_TRANSMIT_595_LOOP:
-000011 b90d                          out       USICR, TEMP_REG_A
-000012 9b76                          sbis      USISR, USIOIF
-000013 cffd                          rjmp      _USI_TRANSMIT_595_LOOP
+                                   _USI_TRANSMIT_LOOP:
+000010 b90d                          out       USICR, TEMP_REG_A
+000011 9b76                          sbis      USISR, USIOIF
+000012 cffd                          rjmp      _USI_TRANSMIT_LOOP
                                  
-000014 9ac0                        sbi      PORTB, USI_LATCH_PIN
-000015 98c0                        cbi      PORTB, USI_LATCH_PIN
-000016 bf5f                        out       SREG, r21
-000017 9508                      ret
+000013 9ac0                        sbi      PORTB, USI_LATCH_PIN
+000014 98c0                        cbi      PORTB, USI_LATCH_PIN
+000015 9508                      ret
                                  
                                  SUBPROGRAM_LED_SHIFTING:
-000018 dff2                        rcall     USI_TRANSMIT_595
-000019 1f44                        rol       COUNTER
-00001a 9508                      ret
+000016 dff4                        rcall     USI_TRANSMIT
+000017 1f44                        rol       COUNTER
+000018 9508                      ret
                                  
                                  ;========================================;
                                  ;            MAIN PROGRAM LOOP           ;
                                  ;========================================;
                                  
                                  LOOP:
-00001b d014                        rcall     TOGGLE_POWER_LED
-00001c dffb                        rcall     SUBPROGRAM_LED_SHIFTING
-00001d d002                        rcall     DELAY
-00001e d001                        rcall     DELAY
-00001f cffb                        rjmp      LOOP
+000019 d014                        rcall     TOGGLE_POWER_LED
+00001a dffb                        rcall     SUBPROGRAM_LED_SHIFTING
+00001b d002                        rcall     DELAY
+00001c d001                        rcall     DELAY
+00001d cffb                        rjmp      LOOP
                                  
                                  DELAY:
-000020 930f                        push      r16
-000021 931f                        push      r17
-000022 94f8                        cli
-000023 ef0f                        ldi       r16, 255
+00001e 930f                        push      r16
+00001f 931f                        push      r17
+000020 94f8                        cli
+000021 ef0f                        ldi       r16, 255
                                    _DELAY_1:
-000024 ef1f                          ldi     r17, 255   
+000022 ef1f                          ldi     r17, 255   
                                    _DELAY_2:
-000025 951a                          dec     r17         
+000023 951a                          dec     r17         
+000024 0000                          nop                 
+000025 0000                          nop                
 000026 0000                          nop                 
-000027 0000                          nop                
-000028 0000                          nop                 
-000029 f7d9                          brne    _DELAY_2    
+000027 f7d9                          brne    _DELAY_2    
                                  
-00002a 950a                          dec     r16
-00002b f7c1                          brne    _DELAY_1    
-00002c 9478                        sei
+000028 950a                          dec     r16
+000029 f7c1                          brne    _DELAY_1    
+00002a 9478                        sei
                                  
-00002d 911f                        pop       r17
-00002e 910f                        pop       r16
-00002f 9508                      ret                    
+00002b 911f                        pop       r17
+00002c 910f                        pop       r16
+00002d 9508                      ret                    
                                  
                                  TOGGLE_POWER_LED:
-000030 e400                        ldi       r16,  (1<<LED_POWER_PORT)
-000031 b312                        in        r17,  PORTD
-000032 2710                        eor       r17,  r16
-000033 bb12                        out       PORTD, r17
-000034 9508                      ret
+00002e e400                        ldi       r16,  (1<<LED_POWER_PORT)
+00002f b312                        in        r17,  PORTD
+000030 2710                        eor       r17,  r16
+000031 bb12                        out       PORTD, r17
+000032 9508                      ret
                                  
                                  
                                  ;========================================;
@@ -932,9 +930,9 @@ counted separately from r26..r31 here.
 x  :   0 y  :   0 z  :   0 r0 :   0 r1 :   0 r2 :   0 r3 :   0 r4 :   0 
 r5 :   0 r6 :   0 r7 :   0 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 
 r13:   0 r14:   0 r15:   0 r16:  14 r17:   7 r18:   0 r19:   4 r20:   3 
-r21:   2 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
+r21:   0 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
 r29:   0 r30:   0 r31:   0 
-Registers used: 5 out of 35 (14.3%)
+Registers used: 4 out of 35 (11.4%)
 
 "ATtiny2313A" instruction use summary:
 .lds  :   0 .sts  :   0 adc   :   0 add   :   0 adiw  :   0 and   :   0 
@@ -945,10 +943,10 @@ brne  :   2 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0
 brvs  :   0 bset  :   0 bst   :   0 cbi   :   1 cbr   :   0 clc   :   0 
 clh   :   0 cli   :   1 cln   :   0 clr   :   0 cls   :   0 clt   :   0 
 clv   :   0 clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   0 
-cpse  :   0 dec   :   2 eor   :   1 icall :   0 ijmp  :   0 in    :   2 
+cpse  :   0 dec   :   2 eor   :   1 icall :   0 ijmp  :   0 in    :   1 
 inc   :   0 ld    :   0 ldd   :   0 ldi   :   9 lds   :   0 lpm   :   0 
 lsl   :   0 lsr   :   0 mov   :   1 movw  :   0 neg   :   0 nop   :   3 
-or    :   0 ori   :   0 out   :   8 pop   :   2 push  :   2 rcall :   6 
+or    :   0 ori   :   0 out   :   7 pop   :   2 push  :   2 rcall :   6 
 ret   :   5 reti  :   0 rjmp  :   4 rol   :   1 ror   :   0 sbc   :   0 
 sbci  :   0 sbi   :   1 sbic  :   0 sbis  :   1 sbiw  :   0 sbr   :   0 
 sbrc  :   0 sbrs  :   0 sec   :   0 seh   :   0 sei   :   1 sen   :   0 
@@ -960,7 +958,7 @@ Instructions used: 19 out of 105 (18.1%)
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x00006a    106      0    106    2048   5.2%
+[.cseg] 0x000000 0x000066    102      0    102    2048   5.0%
 [.dseg] 0x000060 0x000060      0      0      0     128   0.0%
 [.eseg] 0x000000 0x000033      0     51     51     128  39.8%
 
