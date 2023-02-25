@@ -16,16 +16,34 @@
 
 .DEF TEMP_REG_A       = r16
 .DEF TEMP_REG_B       = r17
-.DEF COUNTER          = r20
 
 ;========================================;
 ;                LABELS                  ;
 ;========================================;
 
-.EQU LED_POWER_PORT   = PD6
-.EQU USI_LATCH_PIN    = PB0   ; ST_CP on 74HC595
-.EQU USI_DO_PIN       = PB6   ; DS on 74HC595
-.EQU USI_CLK_PIN      = PB7   ; SH_CP on 74HC595
+.EQU DIGIT_1_PIN              = PD2
+.EQU DIGIT_2_PIN              = PD3
+.EQU DIGIT_3_PIN              = PD4
+.EQU DIGIT_4_PIN              = PD5
+
+.EQU LED_POWER_PIN            = PD6
+
+.EQU USI_LATCH_PIN            = PB0         ; ST_CP on 74HC595
+.EQU USI_DO_PIN               = PB6         ; DS on 74HC595
+.EQU USI_CLK_PIN              = PB7         ; SH_CP on 74HC595
+
+.EQU MCU_STATE_DEFAULT        = 0x01        ; Temperature measurement and threshold comparison
+.EQU MCU_STATE_PROGRAM        = 0x02        ; Write settings of hysteresis into EEPROM
+.EQU MCU_STATE_ERROR          = 0x03        ; Cannot read data from temp sensor or something else
+
+;========================================;
+;              DATA SEGMENT              ;
+;========================================;
+.DSEG
+.ORG SRAM_START
+
+MCU_STATE:     .BYTE 1
+DISPLAY_DIGIT: .BYTE 4
 
 ;========================================;
 ;              CODE SEGMENT              ;
@@ -38,64 +56,87 @@
 ;                VECTORS                 ;
 ;========================================;
 
-rjmp 	RESET_vect			      ; Program start at RESET vector
-;reti                        ; External Interrupt Request 0 / inactive
-;reti		                    ; External Interrupt Request 1 / inactive
-;reti                        ; Timer/Counter1 Capture Event / inactive
-;reti		                    ; Timer/Counter1 Compare Match A / inactive
-;reti                        ; Timer/Counter1 Overflow / inactive
-;reti                        ; Timer/Counter0 Overflow / inactive
-;reti                        ; USART0, Rx Complete / inactive
-;reti                        ; USART0 Data Register Empty / inactive
-;reti						            ; USART0, Tx Complete / inactive
-;reti                        ; Analog Comparator / inactive
-;reti	                      ; Pin Change Interrupt Request 0/ inactive
-;reti                        ; Timer/Counter1 Compare Match B / inactive
-;reti                        ; Timer/Counter0 Compare Match A / inactive
-;reti                        ; Timer/Counter0 Compare Match B / inactive
-;reti                        ; USI Start Condition/ inactive
-;reti                        ; USI Overflow / inactive
-;reti                        ; EEPROM Ready/ inactive
-;reti                        ; Watchdog Timer Overflow / inactive
-;reti                        ; Pin Change Interrupt Request 1 / inactive
-;reti                        ; Pin Change Interrupt Request 2 / inactive
+rjmp 	RESET_vect			       ; Program start at RESET vector
+;reti                         ; External Interrupt Request 0 / inactive
+;reti		                      ; External Interrupt Request 1 / inactive
+;reti                         ; Timer/Counter1 Capture Event / inactive
+;reti		                      ; Timer/Counter1 Compare Match A / inactive
+;reti                         ; Timer/Counter1 Overflow / inactive
+;reti                         ; Timer/Counter0 Overflow / inactive
+;reti                         ; USART0, Rx Complete / inactive
+;reti                         ; USART0 Data Register Empty / inactive
+;reti						              ; USART0, Tx Complete / inactive
+;reti                         ; Analog Comparator / inactive
+;reti	                        ; Pin Change Interrupt Request 0/ inactive
+;reti                         ; Timer/Counter1 Compare Match B / inactive
+;reti                         ; Timer/Counter0 Compare Match A / inactive
+;reti                         ; Timer/Counter0 Compare Match B / inactive
+;reti                         ; USI Start Condition/ inactive
+;reti                         ; USI Overflow / inactive
+;reti                         ; EEPROM Ready/ inactive
+;reti                         ; Watchdog Timer Overflow / inactive
+;reti                         ; Pin Change Interrupt Request 1 / inactive
+;reti                         ; Pin Change Interrupt Request 2 / inactive
 
 RESET_vect:
   ;========================================;
   ;        INITIALIZE STACK POINTER        ;
   ;========================================;
-  ldi       TEMP_REG_A, low(RAMEND)
+  ldi       TEMP_REG_A, LOW(RAMEND)
   out       SPL, TEMP_REG_A
 
 MCU_INIT:
-  ;=======================================================
-  ;  POWER LED    <------------>   PD6                   ;
-  ;    - This LED is used to indicate that device        ;
-  ;       is working correctly                           ;
-  ;                                                      ;
-  ;=======================================================
-  rcall     INIT_PORTS
-  ldi       COUNTER, 0b00000001
-  rjmp      LOOP
-
-INIT_PORTS:
-  ldi       r16, (1<<LED_POWER_PORT)
+  ;=======================================================;
+  ;               INITIALIZE PORTS                        ;
+  ;                                                       ;
+  ;  POWER LED          <------------->   OUT PD6         ;
+  ;    - This LED is used to indicate that device         ;
+  ;       is working correctly                            ;
+  ;  7SEG DIGIT 1       <------------->   OUT PD2         ;
+  ;  7SEG DIGIT 2       <------------->   OUT PD3         ;
+  ;  7SEG DIGIT 3       <------------->   OUT PD4         ;
+  ;  7SEG DIGIT 4       <------------->   OUT PD5         ;
+  ;                                                       ;
+  ;  USI CLOCK PIN      <------------->   OUT PB0         ;
+  ;  USI DATA OUT PIN   <------------->   OUT PB6         ;
+  ;  USI LATCH PIN      <------------->   OUT PB7         ;
+  ;=======================================================;
+  ldi       r16, (1<<LED_POWER_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN)
   out       DDRD, r16
   ldi       r16, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN)
   out       DDRB, r16
-ret
+  ; sbi       PORTD, PD2
+  ; sbi       PORTD, PD3
+  ; sbi       PORTD, PD4
+  ; sbi       PORTD, PD5
 
-;========================================;
-;          SEND BYTE TO 74HC595          ;
-;========================================;
+  ldi       TEMP_REG_A, 4
+  sts       DISPLAY_DIGIT, TEMP_REG_A
+  
+  ldi       TEMP_REG_A, 3
+  sts       DISPLAY_DIGIT+1, TEMP_REG_A
 
+  ldi       TEMP_REG_A, 2
+  sts       DISPLAY_DIGIT+2, TEMP_REG_A
+
+  ldi       TEMP_REG_A, 1
+  sts       DISPLAY_DIGIT+3, TEMP_REG_A
+
+  clr       r1
+  ldi	      ZL,LOW(2*DISPLAY_SYMBOLS)
+	ldi	      ZH,HIGH(2*DISPLAY_SYMBOLS)
+
+  rjmp      LOOP
+
+;=START================================================================================================;
+; Transmit byte into 74HC595 using USI
+;======================================================================================================;
 USI_TRANSMIT:
-  mov       r19, COUNTER
-  out       USIDR, r19            ; Move byte into USI Data Register
+  out       USIDR, r0            ; Move byte from temp register to USI Data Register
 
   ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
-  ldi       r19, (1<<USIOIF)      
-  out       USISR, r19
+  ldi       TEMP_REG_A, (1<<USIOIF)      
+  out       USISR, TEMP_REG_A
   
   ; Load settings of USI into temp register
   ; This will setup USI to Three-wire mode, Software clock strobe (USITC) 
@@ -107,7 +148,7 @@ USI_TRANSMIT:
   ; USITC  <--------------> USI Toggle Clock (Enable clock generation)      
   ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
   
-  _USI_TRANSMIT_LOOP:
+  _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
     out       USICR, TEMP_REG_A   ; Load settings from temp register into USI Control Register
     sbis      USISR, USIOIF       ; If transfer is comleted then move out of loop
     rjmp      _USI_TRANSMIT_LOOP
@@ -117,11 +158,13 @@ USI_TRANSMIT:
   sbi      PORTB, USI_LATCH_PIN
   cbi      PORTB, USI_LATCH_PIN
 ret
+;=END==================================================================================================;
 
-SUBPROGRAM_LED_SHIFTING:
-  rcall     USI_TRANSMIT
-  rol       COUNTER
-ret
+; .MACRO DISPLAY_SEND
+;   ldi       TEMP_REG_A, @0
+;   mov       r0, TEMP_REG_A
+;   rcall     USI_TRANSMIT
+; .ENDMACRO
 
 ;========================================;
 ;            MAIN PROGRAM LOOP           ;
@@ -129,16 +172,55 @@ ret
 
 LOOP:
   rcall     TOGGLE_POWER_LED
-  rcall     SUBPROGRAM_LED_SHIFTING
-  rcall     DELAY
-  rcall     DELAY
+  rcall     DISPLAY_INDICATE
+  ; rcall     USI_TRANSMIT
+
+  ; ldi       TEMP_REG_B, 10
+  ; cp        r1, TEMP_REG_B
+  ; brge      RESET_POINTER
+  ; rjmp      DISPLAY_SEND
+
+  ; RESET_POINTER:
+  ;   clr     r1
+  ;   ldi	    ZL,LOW(2*DISPLAY_SYMBOLS)
+	;   ldi	    ZH,HIGH(2*DISPLAY_SYMBOLS)
+
+  ; DISPLAY_SEND:
+  ;   lpm
+  ;   adiw    Z, 1
+  ;   inc     r1
+  ;   rcall   USI_TRANSMIT
+
+  ; rcall     DELAY
+  ; rcall     DELAY
+  ; rcall     DELAY
+  ; rcall     DELAY
+
   rjmp      LOOP
+
+DISPLAY_INDICATE:
+  sbi       PORTD, DIGIT_1_PIN
+  rcall     DELAY
+  cbi       PORTD, DIGIT_1_PIN
+
+  sbi       PORTD, DIGIT_2_PIN
+  rcall     DELAY
+  cbi       PORTD, DIGIT_2_PIN
+
+  sbi       PORTD, DIGIT_3_PIN
+  rcall     DELAY
+  cbi       PORTD, DIGIT_3_PIN
+
+  sbi       PORTD, DIGIT_4_PIN
+  rcall     DELAY
+  cbi       PORTD, DIGIT_4_PIN
+ret
 
 DELAY:
   push      r16
   push      r17
   cli
-  ldi       r16, 255
+  ldi       r16, 100
   _DELAY_1:
     ldi     r17, 255   
   _DELAY_2:
@@ -157,12 +239,19 @@ DELAY:
 ret                    
 
 TOGGLE_POWER_LED:
-  ldi       r16,  (1<<LED_POWER_PORT)
-  in        r17,  PORTD
-  eor       r17,  r16
+  ldi       r16,   (1<<LED_POWER_PIN)
+  in        r17,   PORTD
+  eor       r17,   r16
   out       PORTD, r17
 ret
 
+DISPLAY_SYMBOLS:
+      ; HGFEDCBA    HGFEDCBA
+  .DB 0b11000000, 0b11111001          ; 0, 1
+  .DB 0b10100100, 0b10110000          ; 2, 3
+  .DB 0b10011001, 0b10010010          ; 4, 5
+  .DB 0b10000010, 0b11111000          ; 6, 7
+  .DB 0b10000000, 0b10010000          ; 8, 9
 
 ;========================================;
 ;             EEPROM SEGMENT             ;

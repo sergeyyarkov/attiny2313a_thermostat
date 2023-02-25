@@ -5,7 +5,7 @@ Path:        /home/sergeyyarkov/Documents/Applications/attiny2313a_thermostat/
 Source file: firmware.asm
 Hex file:    firmware.hex
 Eeprom file: firmware.eep
-Compiled:    28.01.2023, 02:47:03
+Compiled:    25.02.2023, 10:41:03
 Pass:        2
 
      1: ;
@@ -16,8 +16,8 @@ Pass:        2
      6: ; Device Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/doc8246.pdf
      7: ; Package: SOIC-20W_7.5x12.8mm_P1.27mm
      8: ; Assembler: AVR macro assembler 2.2.7
-     9: ; Clock frequency: 12 MHz External Crystal Oscillator
-    10: ; Fuses: lfuse: 0x4F, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
+     9: ; Clock frequency: 8 MHz External Crystal Oscillator
+    10: ; Fuses: lfuse: 0xCF, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
     11: ;
     12: ; Written by Sergey Yarkov 22.01.2023
     13: 
@@ -27,164 +27,235 @@ Pass:        2
    Source line: .INCLUDE "tn2313Adef.inc"
     15: .LIST
     16: 
-    17: .DEF tmp_r_a = r16
-    18: .DEF COUNTER = r20
+    17: .DEF TEMP_REG_A       = r16
+    18: .DEF TEMP_REG_B       = r17
     19: 
     20: ;========================================;
     21: ;                LABELS                  ;
     22: ;========================================;
     23: 
-    24: .EQU LED_POWER_PORT   = PD6
-    25: .EQU CLOCK_PIN        = PB0   ; ST_CP on 74HC595
-    26: .EQU LATCH_PIN        = PB1   ; SH_CP on 74HC595
-    27: .EQU DATA_PIN         = PB2   ; DS on 74HC595
+    24: .EQU DISPLAY_1_PIN              = PD2
+    25: .EQU DISPLAY_2_PIN              = PD3
+    26: .EQU DISPLAY_3_PIN              = PD4
+    27: .EQU DISPLAY_4_PIN              = PD5
     28: 
-    29: ;========================================;
-    30: ;              CODE SEGMENT              ;
-    31: ;========================================;
-    32: 
-    33: .CSEG
-    34: .ORG 0x00
-    35: 
-    36: ;========================================;
-    37: ;                VECTORS                 ;
-    38: ;========================================;
-    39: 
-    40: 000000   C000  rjmp 	RESET_vect			      ; Program start at RESET vector
-    41: ;reti                        ; External Interrupt Request 0 / inactive
-    42: ;reti		                    ; External Interrupt Request 1 / inactive
-    43: ;reti                        ; Timer/Counter1 Capture Event / inactive
-    44: ;reti		                    ; Timer/Counter1 Compare Match A / inactive
-    45: ;reti                        ; Timer/Counter1 Overflow / inactive
-    46: ;reti                        ; Timer/Counter0 Overflow / inactive
-    47: ;reti                        ; USART0, Rx Complete / inactive
-    48: ;reti                        ; USART0 Data Register Empty / inactive
-    49: ;reti						            ; USART0, Tx Complete / inactive
-    50: ;reti                        ; Analog Comparator / inactive
-    51: ;reti	                      ; Pin Change Interrupt Request 0/ inactive
-    52: ;reti                        ; Timer/Counter1 Compare Match B / inactive
-    53: ;reti                        ; Timer/Counter0 Compare Match A / inactive
-    54: ;reti                        ; Timer/Counter0 Compare Match B / inactive
-    55: ;reti                        ; USI Start Condition/ inactive
-    56: ;reti                        ; USI Overflow / inactive
-    57: ;reti                        ; EEPROM Ready/ inactive
-    58: ;reti                        ; Watchdog Timer Overflow / inactive
-    59: ;reti                        ; Pin Change Interrupt Request 1 / inactive
-    60: ;reti                        ; Pin Change Interrupt Request 2 / inactive
-    61: 
-    62: RESET_vect:
-    63:   ;========================================;
-    64:   ;        INITIALIZE STACK POINTER        ;
-    65:   ;========================================;
-    66: 000001   ED0F  ldi       tmp_r_a, low(RAMEND)
-    67: 000002   BF0D  out       SPL, tmp_r_a
-    68: 
-    69: MCU_INIT:
-    70:   ;=======================================================
-    71:   ;  POWER LED    <------------>   PD6                   ;
-    72:   ;    - This LED is used to indicate that device        ;
-    73:   ;       is working correctly                           ;
-    74:   ;                                                      ;
-    75:   ;=======================================================
-    76: 000003   D002  rcall     INIT_PORTS
-    77: 
-    78:   ;========================================;
-    79:   ;       USI IS USED TO COMMUNICATE       ;
-    80:   ;     WITH SHIFT REGISTER (74HC595N)     ;
-    81:   ;========================================;
-    82: 000004   D006  rcall     INIT_USI
-    83:   
-    84: 000005   C01D  rjmp      LOOP
-    85: 
-    86: INIT_PORTS:
-    87: 000006   E400  ldi       r16, (1<<LED_POWER_PORT)
-    88: 000007   BB01  out       DDRD, r16
-    89: 000008   E007  ldi       r16, (1<<CLOCK_PIN) | (1<<LATCH_PIN) | (1<<DATA_PIN)
-    90: 000009   BB07  out       DDRB, r16
-    91: 00000A   9508  ret
-    92: 
-    93: INIT_USI:
-    94: 
-    95: 00000B   9508  ret
-    96: 
-    97: CLOCK_595:
-    98: 00000C   930F  push      r16
-    99: 00000D   E001  ldi       r16,  (1<<CLOCK_PIN)
-   100: 00000E   B318  in        r17,  PORTB
-   101: 00000F   2710  eor       r17,  r16
-   102: 000010   BB18  out       PORTB, r17
-   103: 000011   910F  pop       r16
-   104: 000012   9508  ret
-   105: 
-   106: TRANSMIT_595:
-   107: 000013   933F  push      r19
-   108: 000014   E23A  ldi       r19, 0b00101010 ; Data to transmit
-   109: 000015   E008  ldi       r16, 8
-   110:   _TRANSMIT_595_LOOP:
-   111: 000016   0F33  lsl     r19
-   112: 000017   F410  brcc    _TRANSMIT_595_SEND_LOW
-   113: 000018   F000  brcs    _TRANSMIT_595_SEND_HIGH
-   114:     
-   115:     _TRANSMIT_595_SEND_HIGH:
-   116: 000019   C000  rjmp    _TRANSMIT_595_PROCEED
-   117:       
-   118: 
-   119:     _TRANSMIT_595_SEND_LOW:
-   120: 
-   121:     _TRANSMIT_595_PROCEED:
-   122: 00001A   DFF1  rcall    CLOCK_595
-   123: 00001B   DFF0  rcall    CLOCK_595
-   124: 00001C   950A  dec     r16
-   125: 00001D   F7C1  brne _TRANSMIT_595_LOOP
-   126: 00001E   913F  pop       r19
-   127: 00001F   9508  ret
-   128: 
-   129: SUBPROGRAM_LED_SHIFTING:
-   130: 000020   9543  inc       COUNTER
-   131: 000021   DFF1  rcall     TRANSMIT_595
-   132: 000022   9508  ret
-   133: 
-   134: ;========================================;
-   135: ;            MAIN PROGRAM LOOP           ;
-   136: ;========================================;
-   137: 
-   138: LOOP:
-   139: 000023   D00F  rcall     TOGGLE_POWER_LED
-   140: 000024   DFFB  rcall     SUBPROGRAM_LED_SHIFTING
-   141: 000025   D001  rcall     DELAY
-   142: 000026   CFFC  rjmp      LOOP
-   143: 
-   144: DELAY:
-   145: 000027   94F8  cli
-   146: 000028   E00A  ldi       r16, 10    ; 1
-   147:   _DELAY_1:
-   148: 000029   EF1F  ldi     r17, 255    ; 1
-   149:   _DELAY_2:
-   150: 00002A   951A  dec     r17         ; 1
-   151: 00002B   0000  nop                 ; 1
-   152: 00002C   0000  nop                 ; 1
-   153: 00002D   0000  nop                 ; 1
-   154: 00002E   F7D9  brne    _DELAY_2    ; 2/1
-   155: 
-   156: 00002F   950A  dec     r16
-   157: 000030   F7C1  brne    _DELAY_1    ; 2/1
-   158: 000031   9478  sei
-   159: 000032   9508  ret                     ; 4
-   160: 
-   161: TOGGLE_POWER_LED:
-   162: 000033   E400  ldi       r16,  (1<<LED_POWER_PORT)
-   163: 000034   B312  in        r17,  PORTD
-   164: 000035   2710  eor       r17,  r16
-   165: 000036   BB12  out       PORTD, r17
-   166: 000037   9508  ret
+    29: .EQU LED_POWER_PIN              = PD6
+    30: 
+    31: .EQU USI_LATCH_PIN              = PB0         ; ST_CP on 74HC595
+    32: .EQU USI_DO_PIN                 = PB6         ; DS on 74HC595
+    33: .EQU USI_CLK_PIN                = PB7         ; SH_CP on 74HC595
+    34: 
+    35: ;========================================;
+    36: ;              DATA SEGMENT              ;
+    37: ;========================================;
+    38: .DSEG
+    39: .ORG SRAM_START
+    40: 
+    41: DISPLAY_DIGIT: .BYTE 4
+    42: 
+    43: ;========================================;
+    44: ;              CODE SEGMENT              ;
+    45: ;========================================;
+    46: 
+    47: .CSEG
+    48: .ORG 0x00
+    49: 
+    50: ;========================================;
+    51: ;                VECTORS                 ;
+    52: ;========================================;
+    53: 
+    54: 000000   C000  rjmp 	RESET_vect			       ; Program start at RESET vector
+    55: ;reti                         ; External Interrupt Request 0 / inactive
+    56: ;reti		                      ; External Interrupt Request 1 / inactive
+    57: ;reti                         ; Timer/Counter1 Capture Event / inactive
+    58: ;reti		                      ; Timer/Counter1 Compare Match A / inactive
+    59: ;reti                         ; Timer/Counter1 Overflow / inactive
+    60: ;reti                         ; Timer/Counter0 Overflow / inactive
+    61: ;reti                         ; USART0, Rx Complete / inactive
+    62: ;reti                         ; USART0 Data Register Empty / inactive
+    63: ;reti						              ; USART0, Tx Complete / inactive
+    64: ;reti                         ; Analog Comparator / inactive
+    65: ;reti	                        ; Pin Change Interrupt Request 0/ inactive
+    66: ;reti                         ; Timer/Counter1 Compare Match B / inactive
+    67: ;reti                         ; Timer/Counter0 Compare Match A / inactive
+    68: ;reti                         ; Timer/Counter0 Compare Match B / inactive
+    69: ;reti                         ; USI Start Condition/ inactive
+    70: ;reti                         ; USI Overflow / inactive
+    71: ;reti                         ; EEPROM Ready/ inactive
+    72: ;reti                         ; Watchdog Timer Overflow / inactive
+    73: ;reti                         ; Pin Change Interrupt Request 1 / inactive
+    74: ;reti                         ; Pin Change Interrupt Request 2 / inactive
+    75: 
+    76: RESET_vect:
+    77:   ;========================================;
+    78:   ;        INITIALIZE STACK POINTER        ;
+    79:   ;========================================;
+    80: 000001   ED0F  ldi       TEMP_REG_A, LOW(RAMEND)
+    81: 000002   BF0D  out       SPL, TEMP_REG_A
+    82: 
+    83: MCU_INIT:
+    84:   ;=======================================================;
+    85:   ;               INITIALIZE PORTS                        ;
+    86:   ;                                                       ;
+    87:   ;  POWER LED          <------------->   OUT PD6         ;
+    88:   ;    - This LED is used to indicate that device         ;
+    89:   ;       is working correctly                            ;
+    90:   ;  7SEG DIGIT 1       <------------->   OUT PD2         ;
+    91:   ;  7SEG DIGIT 2       <------------->   OUT PD3         ;
+    92:   ;  7SEG DIGIT 3       <------------->   OUT PD4         ;
+    93:   ;  7SEG DIGIT 4       <------------->   OUT PD5         ;
+    94:   ;                                                       ;
+    95:   ;  USI CLOCK PIN      <------------->   OUT PB0         ;
+    96:   ;  USI DATA OUT PIN   <------------->   OUT PB6         ;
+    97:   ;  USI LATCH PIN      <------------->   OUT PB7         ;
+    98:   ;=======================================================;
+    99: 000003   E70C  ldi       r16, (1<<LED_POWER_PIN) | (1<<DISPLAY_1_PIN) | (1<<DISPLAY_2_PIN) | (1<<DISPLAY_3_PIN) | (1<<DISPLAY_4_PIN)
+   100: 000004   BB01  out       DDRD, r16
+   101: 000005   EC01  ldi       r16, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN)
+   102: 000006   BB07  out       DDRB, r16
+   103: 000007   9A92  sbi       PORTD, PD2
+   104: 000008   9A93  sbi       PORTD, PD3
+   105: 000009   9A94  sbi       PORTD, PD4
+   106: 00000A   9A95  sbi       PORTD, PD5
+   107: 
+   108: 00000B   E004  ldi       TEMP_REG_A, 4
+   109: 00000C   9300  sts       DISPLAY_DIGIT, TEMP_REG_A
+        00000D   0060
+   110:   
+   111: 00000E   E003  ldi       TEMP_REG_A, 3
+   112: 00000F   9300  sts       DISPLAY_DIGIT+1, TEMP_REG_A
+        000010   0061
+   113: 
+   114: 000011   E002  ldi       TEMP_REG_A, 2
+   115: 000012   9300  sts       DISPLAY_DIGIT+2, TEMP_REG_A
+        000013   0062
+   116: 
+   117: 000014   E001  ldi       TEMP_REG_A, 1
+   118: 000015   9300  sts       DISPLAY_DIGIT+3, TEMP_REG_A
+        000016   0063
+   119: 
+   120: 000017   2411  clr       r1
+   121: 000018   E9E6  ldi	      ZL,LOW(2*DISPLAY_SYMBOLS)
+   122: 000019   E0F0  ldi	      ZH,HIGH(2*DISPLAY_SYMBOLS)
+   123: 
+   124: 00001A   C00A  rjmp      LOOP
+   125: 
+   126: ;=START================================================================================================;
+   127: ; Transmit byte into 74HC595 using USI
+   128: ;======================================================================================================;
+   129: USI_TRANSMIT:
+   130: 00001B   B80F  out       USIDR, r0            ; Move byte from temp register to USI Data Register
+   131: 
+   132:   ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
+   133: 00001C   E400  ldi       TEMP_REG_A, (1<<USIOIF)      
+   134: 00001D   B90E  out       USISR, TEMP_REG_A
+   135:   
+   136:   ; Load settings of USI into temp register
+   137:   ; This will setup USI to Three-wire mode, Software clock strobe (USITC) 
+   138:   ; with External, positive edge and toggle USCK
+   139:   ;
+   140:   ; USIWM0 <--------------> USI Wire Mode
+   141:   ; USICS1 <--------------> USI Clock Source Select
+   142:   ; USICLK <--------------> USI Clock Strobe
+   143:   ; USITC  <--------------> USI Toggle Clock (Enable clock generation)      
+   144: 00001E   E10B  ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
+   145:   
+   146:   _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
+   147: 00001F   B90D  out       USICR, TEMP_REG_A   ; Load settings from temp register into USI Control Register
+   148: 000020   9B76  sbis      USISR, USIOIF       ; If transfer is comleted then move out of loop
+   149: 000021   CFFD  rjmp      _USI_TRANSMIT_LOOP
+   150: 
+   151:   ; Send pulse into LATCH pin. 
+   152:   ; This will copy byte from 74hc595 shift register into 74hc595 storage register
+   153: 000022   9AC0  sbi      PORTB, USI_LATCH_PIN
+   154: 000023   98C0  cbi      PORTB, USI_LATCH_PIN
+   155: 000024   9508  ret
+   156: ;=END==================================================================================================;
+   157: 
+   158: ; .MACRO DISPLAY_SEND
+   159: ;   ldi       TEMP_REG_A, @0
+   160: ;   mov       r0, TEMP_REG_A
+   161: ;   rcall     USI_TRANSMIT
+   162: ; .ENDMACRO
+   163: 
+   164: ;========================================;
+   165: ;            MAIN PROGRAM LOOP           ;
+   166: ;========================================;
    167: 
-   168: 
-   169: ;========================================;
-   170: ;             EEPROM SEGMENT             ;
-   171: ;========================================;
-   172: 
-   173: .ESEG
-   174: INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+   168: LOOP:
+   169: 000025   D020  rcall     TOGGLE_POWER_LED
+   170: 
+   171: 000026   E01A  ldi       TEMP_REG_B, 10
+   172: 000027   1611  cp        r1, TEMP_REG_B
+   173: 000028   F40C  brge      RESET_POINTER
+   174: 000029   C003  rjmp      DISPLAY_SEND
+   175: 
+   176:   RESET_POINTER:
+   177: 00002A   2411  clr r1
+   178: 00002B   E9E6  ldi	ZL,LOW(2*DISPLAY_SYMBOLS)
+   179: 00002C   E0F0  ldi	ZH,HIGH(2*DISPLAY_SYMBOLS)
+   180: 
+   181:   DISPLAY_SEND:
+   182: 00002D   9005  lpm	      r0, Z+
+   183: 00002E   9413  inc       r1
+   184: 00002F   DFEB  rcall     USI_TRANSMIT
+   185: 
+   186: 000030   D005  rcall     DELAY
+   187: 000031   D004  rcall     DELAY
+   188: 000032   D003  rcall     DELAY
+   189: 000033   D002  rcall     DELAY
+   190: 000034   D001  rcall     DELAY
+   191: 
+   192: 000035   CFEF  rjmp      LOOP
+   193: 
+   194: DELAY:
+   195: 000036   930F  push      r16
+   196: 000037   931F  push      r17
+   197: 000038   94F8  cli
+   198: 000039   EF0F  ldi       r16, 255
+   199:   _DELAY_1:
+   200: 00003A   EF1F  ldi     r17, 255   
+   201:   _DELAY_2:
+   202: 00003B   951A  dec     r17         
+   203: 00003C   0000  nop                 
+   204: 00003D   0000  nop                
+   205: 00003E   0000  nop                 
+   206: 00003F   F7D9  brne    _DELAY_2    
+   207: 
+   208: 000040   950A  dec     r16
+   209: 000041   F7C1  brne    _DELAY_1    
+   210: 000042   9478  sei
+   211: 
+   212: 000043   911F  pop       r17
+   213: 000044   910F  pop       r16
+   214: 000045   9508  ret                    
+   215: 
+   216: TOGGLE_POWER_LED:
+   217: 000046   E400  ldi       r16,  (1<<LED_POWER_PIN)
+   218: 000047   B312  in        r17,  PORTD
+   219: 000048   2710  eor       r17,  r16
+   220: 000049   BB12  out       PORTD, r17
+   221: 00004A   9508  ret
+   222: 
+   223: DISPLAY_SYMBOLS:
+   224:       ; HGFEDCBA    HGFEDCBA
+   225:   .DB 0b11000000, 0b11111001          ; 0, 1
+        00004B F9C0
+   226:   .DB 0b10100100, 0b10110000          ; 2, 3
+        00004C B0A4
+   227:   .DB 0b10011001, 0b10010010          ; 4, 5
+        00004D 9299
+   228:   .DB 0b10000010, 0b11111000          ; 6, 7
+        00004E F882
+   229:   .DB 0b10000000, 0b10010000          ; 8, 9
+        00004F 9080
+   230: 
+   231: ;========================================;
+   232: ;             EEPROM SEGMENT             ;
+   233: ;========================================;
+   234: 
+   235: .ESEG
+   236: INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
         000000 41 56 52 20 54 48 45 52
         000008 4D 4F 53 54 41 54 2E 20
         000010 57 52 49 54 54 45 4E 20
@@ -196,39 +267,40 @@ Pass:        2
 List of symbols:
 Type nDef nUsed             Decimalval           Hexval Name
   T     1     1                     89               59 ATTINY2313A
+  L     1     4                     96               60 DISPLAY_DIGIT
   L     1     2                      1               01 RESET_VECT
   L     1     0                      3               03 MCU_INIT
-  L     1     2                      6               06 INIT_PORTS
-  L     1     2                     11               0B INIT_USI
-  L     1     4                     12               0C CLOCK_595
-  L     1     2                     19               13 TRANSMIT_595
-  L     1     2                     22               16 _TRANSMIT_595_LOOP
-  L     1     2                     25               19 _TRANSMIT_595_SEND_HIGH
-  L     1     2                     26               1A _TRANSMIT_595_SEND_LOW
-  L     1     2                     26               1A _TRANSMIT_595_PROCEED
-  L     1     2                     32               20 SUBPROGRAM_LED_SHIFTING
-  L     1     4                     35               23 LOOP
-  L     1     2                     39               27 DELAY
-  L     1     2                     41               29 _DELAY_1
-  L     1     2                     42               2A _DELAY_2
-  L     1     2                     51               33 TOGGLE_POWER_LED
+  L     1     2                     27               1B USI_TRANSMIT
+  L     1     2                     31               1F _USI_TRANSMIT_LOOP
+  L     1     4                     37               25 LOOP
+  L     1     2                     42               2A RESET_POINTER
+  L     1     2                     45               2D DISPLAY_SEND
+  L     1    10                     54               36 DELAY
+  L     1     2                     58               3A _DELAY_1
+  L     1     2                     59               3B _DELAY_2
+  L     1     2                     70               46 TOGGLE_POWER_LED
+  L     1     4                     75               4B DISPLAY_SYMBOLS
   L     1     0                      0               00 INFO
-  R     1     2                     16               10 TMP_R_A
-  R     1     1                     20               14 COUNTER
+  R     1    14                     16               10 TEMP_REG_A
+  R     1     2                     17               11 TEMP_REG_B
   C     1     0                     23               17 NOW_Y
-  C     1     0                      1               01 NOW_M
-  C     1     0                     28               1C NOW_D
-  C     1     0                  44954             AF9A NOW_I
-  C     1     2                      6               06 LED_POWER_PORT
-  C     1     2                      0               00 CLOCK_PIN
-  C     1     1                      1               01 LATCH_PIN
-  C     1     1                      2               02 DATA_PIN
+  C     1     0                      2               02 NOW_M
+  C     1     0                     25               19 NOW_D
+  C     1     0                  44982             AFB6 NOW_I
+  C     1     1                      2               02 DISPLAY_1_PIN
+  C     1     1                      3               03 DISPLAY_2_PIN
+  C     1     1                      4               04 DISPLAY_3_PIN
+  C     1     1                      5               05 DISPLAY_4_PIN
+  C     1     2                      6               06 LED_POWER_PIN
+  C     1     3                      0               00 USI_LATCH_PIN
+  C     1     1                      6               06 USI_DO_PIN
+  C     1     1                      7               07 USI_CLK_PIN
    No macros.
 
-Program             :       56 words.
-Constants           :        0 words.
-Total program memory:       56 words.
+Program             :       75 words.
+Constants           :        5 words.
+Total program memory:       80 words.
 Eeprom space        :       51 bytes.
-Data segment        :        0 bytes.
+Data segment        :        4 bytes.
 Compilation completed, no errors.
-Compilation ended 28.01.2023, 02:47:03
+Compilation ended 25.02.2023, 10:41:03
