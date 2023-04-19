@@ -17,10 +17,6 @@
 .DEF TEMP_REG_A       = r16
 .DEF TEMP_REG_B       = r17
 
-;========================================;
-;                LABELS                  ;
-;========================================;
-
 .EQU DIGIT_1_PIN              = PD2
 .EQU DIGIT_2_PIN              = PD3
 .EQU DIGIT_3_PIN              = PD4
@@ -32,200 +28,181 @@
 .EQU USI_DO_PIN               = PB6         ; DS on 74HC595
 .EQU USI_CLK_PIN              = PB7         ; SH_CP on 74HC595
 
-.EQU MCU_STATE_DEFAULT        = 0x01        ; Temperature measurement and threshold comparison
-.EQU MCU_STATE_PROGRAM        = 0x02        ; Write settings of hysteresis into EEPROM
-.EQU MCU_STATE_ERROR          = 0x03        ; Cannot read data from temp sensor or something else
+.EQU MCU_STATE_DEFAULT        = 0x01        ; Режим измерения температуры и сравнения с заданными параметрами
+.EQU MCU_STATE_PROGRAM        = 0x02        ; Режим настройки параметров в EEPROM
+.EQU MCU_STATE_ERROR          = 0x03        ; Режим ошибки, например когда не подключен датчик
 
-;========================================;
-;              DATA SEGMENT              ;
-;========================================;
+; **** СЕГМЕНТ ДАННЫХ ********************************************
 .DSEG
 .ORG SRAM_START
 
-MCU_STATE:     .BYTE 1
-DISPLAY_DIGIT: .BYTE 4
+MCU_STATE:      .BYTE 1                     ; Текущее состояние МК
+NUMBER:         .BYTE 2
+DIGITS:         .BYTE 4                     ; Ячейки, где хранятся символы, для вывода на индикатор
+CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
 
-;========================================;
-;              CODE SEGMENT              ;
-;========================================;
-
+; **** СЕГМЕНТ КОДА **********************************************
 .CSEG
-.ORG 0x00
 
-;========================================;
-;                VECTORS                 ;
-;========================================;
+.ORG 0x00     
+  rjmp 	RESET_vect
 
-rjmp 	RESET_vect			       ; Program start at RESET vector
-;reti                         ; External Interrupt Request 0 / inactive
-;reti		                      ; External Interrupt Request 1 / inactive
-;reti                         ; Timer/Counter1 Capture Event / inactive
-;reti		                      ; Timer/Counter1 Compare Match A / inactive
-;reti                         ; Timer/Counter1 Overflow / inactive
-;reti                         ; Timer/Counter0 Overflow / inactive
-;reti                         ; USART0, Rx Complete / inactive
-;reti                         ; USART0 Data Register Empty / inactive
-;reti						              ; USART0, Tx Complete / inactive
-;reti                         ; Analog Comparator / inactive
-;reti	                        ; Pin Change Interrupt Request 0/ inactive
-;reti                         ; Timer/Counter1 Compare Match B / inactive
-;reti                         ; Timer/Counter0 Compare Match A / inactive
-;reti                         ; Timer/Counter0 Compare Match B / inactive
-;reti                         ; USI Start Condition/ inactive
-;reti                         ; USI Overflow / inactive
-;reti                         ; EEPROM Ready/ inactive
-;reti                         ; Watchdog Timer Overflow / inactive
-;reti                         ; Pin Change Interrupt Request 1 / inactive
-;reti                         ; Pin Change Interrupt Request 2 / inactive
+.ORG 0x000D   
+  rjmp  TIMER0_COMPA_vect
+
+; **** ДИНАМИЧЕСКАЯ ИНДИКАЦИЯ ************************************
+TIMER0_COMPA_vect:
+  lds       r20,  CURRENT_DIGIT
+  cpi       r20,  5
+  brge      reset_digit_idx
+  rjmp      _indicate_1
+
+  reset_digit_idx:
+    clr     r20
+    sts     CURRENT_DIGIT, r20
+
+    _indicate_1:
+    cpi       r20, 0
+    brne      _indicate_2
+
+    cbi       PORTD, DIGIT_2_PIN
+    cbi       PORTD, DIGIT_3_PIN
+    cbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_1_PIN
+    lds       TEMP_REG_A, DIGITS+3
+    rcall     DISPLAY_DECODER
+    rcall     USI_TRANSMIT
+
+    _indicate_2:
+    cpi       r20, 1
+    brne      _indicate_3
+
+    cbi       PORTD, DIGIT_1_PIN
+    cbi       PORTD, DIGIT_3_PIN
+    cbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_2_PIN
+    lds       TEMP_REG_A, DIGITS+2
+    rcall     DISPLAY_DECODER
+    rcall     USI_TRANSMIT
+
+    _indicate_3:
+    cpi       r20, 2
+    brne      _indicate_4
+
+    cbi       PORTD, DIGIT_1_PIN
+    cbi       PORTD, DIGIT_2_PIN
+    cbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_3_PIN
+    lds       TEMP_REG_A, DIGITS+1
+    rcall     DISPLAY_DECODER
+    rcall     USI_TRANSMIT
+
+    _indicate_4:
+    cpi       r20, 3
+    brne      _indicate_exit
+
+    cbi       PORTD, DIGIT_1_PIN
+    cbi       PORTD, DIGIT_2_PIN
+    cbi       PORTD, DIGIT_3_PIN
+    sbi       PORTD, DIGIT_4_PIN
+    lds       TEMP_REG_A, DIGITS
+    rcall     DISPLAY_DECODER
+    rcall     USI_TRANSMIT
+
+    _indicate_exit:
+    inc       r20
+    sts       CURRENT_DIGIT, r20
+reti
 
 RESET_vect:
-  ;========================================;
-  ;        INITIALIZE STACK POINTER        ;
-  ;========================================;
   ldi       TEMP_REG_A, LOW(RAMEND)
   out       SPL, TEMP_REG_A
 
 MCU_INIT:
-  ;=======================================================;
-  ;               INITIALIZE PORTS                        ;
-  ;                                                       ;
-  ;  POWER LED          <------------->   OUT PD6         ;
-  ;    - This LED is used to indicate that device         ;
-  ;       is working correctly                            ;
-  ;  7SEG DIGIT 1       <------------->   OUT PD2         ;
-  ;  7SEG DIGIT 2       <------------->   OUT PD3         ;
-  ;  7SEG DIGIT 3       <------------->   OUT PD4         ;
-  ;  7SEG DIGIT 4       <------------->   OUT PD5         ;
-  ;                                                       ;
-  ;  USI CLOCK PIN      <------------->   OUT PB0         ;
-  ;  USI DATA OUT PIN   <------------->   OUT PB6         ;
-  ;  USI LATCH PIN      <------------->   OUT PB7         ;
-  ;=======================================================;
+  ; **** ИНИЦИАЛИЗАЦИЯ ПОРТОВ ************************************
   ldi       r16, (1<<LED_POWER_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN)
   out       DDRD, r16
-  ldi       r16, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN)
+  ldi       r16, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (1<<PB2)
   out       DDRB, r16
-  ; sbi       PORTD, PD2
-  ; sbi       PORTD, PD3
-  ; sbi       PORTD, PD4
-  ; sbi       PORTD, PD5
-
-  ldi       TEMP_REG_A, 1
-  sts       DISPLAY_DIGIT, TEMP_REG_A
   
-  ldi       TEMP_REG_A, 1
-  sts       DISPLAY_DIGIT+1, TEMP_REG_A
+  ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРОВ **********************************
+  ldi       r16, (1<<COM0A0) | (1<<WGM01)
+  out       TCCR0A, r16
 
-  ldi       TEMP_REG_A, 9
-  sts       DISPLAY_DIGIT+2, TEMP_REG_A
+  ldi       r16,  (1<<CS02) | (1<<CS00)
+  out       TCCR0B, r16
 
-  ldi       TEMP_REG_A, 1
-  sts       DISPLAY_DIGIT+3, TEMP_REG_A
+  ldi       r16, 40
+  out       OCR0A, r16
+
+  ldi       r16, (1<<OCIE0A)
+  out       TIMSK, r16
 
   clr       r1
   ldi	      ZL,LOW(2*DISPLAY_SYMBOLS)
 	ldi	      ZH,HIGH(2*DISPLAY_SYMBOLS)
 
-  rjmp      LOOP
+  ; загружаем число, которое нужно показать на индикатор
+  .EQU DISPLAY_NUMBER = 279
+  ldi   r22,    LOW(DISPLAY_NUMBER)
+  ldi   r23,    HIGH(DISPLAY_NUMBER)
 
-;=START================================================================================================;
-; Transmit byte into 74HC595 using USI
-;======================================================================================================;
-USI_TRANSMIT:
-  out       USIDR, r0            ; Move byte from temp register to USI Data Register
+  sts   CURRENT_DIGIT, r1
 
-  ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
-  ldi       TEMP_REG_A, (1<<USIOIF)      
-  out       USISR, TEMP_REG_A
-  
-  ; Load settings of USI into temp register
-  ; This will setup USI to Three-wire mode, Software clock strobe (USITC) 
-  ; with External, positive edge and toggle USCK
-  ;
-  ; USIWM0 <--------------> USI Wire Mode
-  ; USICS1 <--------------> USI Clock Source Select
-  ; USICLK <--------------> USI Clock Strobe
-  ; USITC  <--------------> USI Toggle Clock (Enable clock generation)      
-  ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
-  
-  _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
-    out       USICR, TEMP_REG_A   ; Load settings from temp register into USI Control Register
-    sbis      USISR, USIOIF       ; If transfer is comleted then move out of loop
-    rjmp      _USI_TRANSMIT_LOOP
-
-  ; Send pulse into LATCH pin. 
-  ; This will copy byte from 74hc595 shift register into 74hc595 storage register
-  sbi      PORTB, USI_LATCH_PIN
-  cbi      PORTB, USI_LATCH_PIN
-ret
-;=END==================================================================================================;
-
-; .MACRO DISPLAY_SEND
-;   ldi       TEMP_REG_A, @0
-;   mov       r0, TEMP_REG_A
-;   rcall     USI_TRANSMIT
-; .ENDMACRO
-
-;========================================;
-;            MAIN PROGRAM LOOP           ;
-;========================================;
-
-LOOP:
-  rcall     TOGGLE_POWER_LED
-  rcall     DISPLAY_INDICATE
-
-  ; ldi       TEMP_REG_B, 10
-  ; cp        r1, TEMP_REG_B
-  ; brge      RESET_POINTER
-  ; rjmp      DISPLAY_SEND
-
-  ; RESET_POINTER:
-  ;   clr     r1
-  ;   ldi	    ZL,LOW(2*DISPLAY_SYMBOLS)
-	;   ldi	    ZH,HIGH(2*DISPLAY_SYMBOLS)
-
-  ; DISPLAY_SEND:
-  ;   lpm
-  ;   adiw    Z, 1
-  ;   inc     r1
-  ;   rcall   USI_TRANSMIT
-
-  ; rcall     DELAY
-  ; rcall     DELAY
-  ; rcall     DELAY
-  ; rcall     DELAY
+  sei
 
   rjmp      LOOP
 
-DISPLAY_INDICATE:
-  sbi       PORTD, DIGIT_1_PIN
-  lds       TEMP_REG_A, DISPLAY_DIGIT+3
-  rcall     DISPLAY_DECODER
-  rcall     USI_TRANSMIT
-  rcall     DELAY
-  cbi       PORTD, DIGIT_1_PIN
+; **** ПОДПРОГРАММЫ **********************************************
+.INCLUDE "div16u.asm"
+.INCLUDE "usi.asm"
 
-  sbi       PORTD, DIGIT_2_PIN
-  lds       TEMP_REG_A, DISPLAY_DIGIT+2
-  rcall     DISPLAY_DECODER
-  rcall     USI_TRANSMIT
-  rcall     DELAY
-  cbi       PORTD, DIGIT_2_PIN
+; **** ГЛАВНЫЙ ЦИКЛ **********************************************
+LOOP:  
+  ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *******************
+  ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
+  ;           путем деления этого числа несколько раз
+  GET_DIGITS:
+    cli
+    ldi   r24,    4                     ; максимум 4 цифры, т.к индикатор четырех разрядный
+    ldi   XL, LOW(DIGITS)
+    ldi   XH, HIGH(DIGITS)
 
-  sbi       PORTD, DIGIT_3_PIN
-  lds       TEMP_REG_A, DISPLAY_DIGIT+1
-  rcall     DISPLAY_DECODER
-  rcall     USI_TRANSMIT
-  rcall     DELAY
-  cbi       PORTD, DIGIT_3_PIN
+    .equ  dividend_addr = $0060
+    .equ  divisor       = 10
 
-  sbi       PORTD, DIGIT_4_PIN
-  lds       TEMP_REG_A, DISPLAY_DIGIT
-  rcall     DISPLAY_DECODER
-  rcall     USI_TRANSMIT
-  rcall     DELAY
-  cbi       PORTD, DIGIT_4_PIN
-ret
+    ; загружаем делимое в адрес SRAM делимого
+    sts   dividend_addr,     r22
+    sts   dividend_addr+1,   r23
+
+    ; четыре раза производим деление для получения остатков
+    DIV_LOOP:
+      ; заполняем нужные регистры
+      lds   dd16uL, dividend_addr
+      lds   dd16uH, dividend_addr+1
+      ldi   dv16uL, LOW(divisor)
+      ldi   dv16uH, HIGH(divisor)
+      
+      rcall div16u                      ; делим
+
+      st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю
+
+      ; обновляем делимое
+      sts  dividend_addr, dres16uL
+      sts  dividend_addr+1, dres16uH
+
+      dec   r24                         ; декрементируем счетчик цикла
+      brne  DIV_LOOP                    ; делим еще раз если не 0
+      sei
+
+  rcall       TOGGLE_POWER_LED
+  rcall       DELAY
+  rcall       DELAY
+  rcall       DELAY
+  rcall       DELAY
+  rcall       DELAY
+
+  rjmp      LOOP
 
 DISPLAY_DECODER:
   ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
@@ -241,8 +218,7 @@ ret
 DELAY:
   push      r16
   push      r17
-  cli
-  ldi       r16, 50
+  ldi       r16, 255
   _DELAY_1:
     ldi     r17, 255   
   _DELAY_2:
@@ -254,17 +230,20 @@ DELAY:
 
     dec     r16
     brne    _DELAY_1    
-  sei
 
   pop       r17
   pop       r16
 ret                    
 
 TOGGLE_POWER_LED:
+  push      r16
+  push      r17
   ldi       r16,   (1<<LED_POWER_PIN)
   in        r17,   PORTD
   eor       r17,   r16
   out       PORTD, r17
+  pop       r17
+  pop       r16
 ret
 
 DISPLAY_SYMBOLS:
@@ -275,9 +254,6 @@ DISPLAY_SYMBOLS:
   .DB 0b10000010, 0b11111000          ; 6, 7
   .DB 0b10000000, 0b10010000          ; 8, 9
 
-;========================================;
-;             EEPROM SEGMENT             ;
-;========================================;
-
-.ESEG
-INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+; **** СЕГМЕНТ EEPROM ********************************************
+; .ESEG
+; INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
