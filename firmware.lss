@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  firmware.asm Sat Feb 25 23:36:49 2023
+AVRASM ver. 2.2.7  firmware.asm Thu Apr 06 18:29:19 2023
 
 firmware.asm(14): Including file 'tn2313Adef.inc'
 firmware.asm(14): Including file 'tn2313Adef.inc'
@@ -814,20 +814,20 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                    ; sbi       PORTD, PD4
                                    ; sbi       PORTD, PD5
                                  
-000007 e004                        ldi       TEMP_REG_A, 4
+000007 e001                        ldi       TEMP_REG_A, 1
 000008 9300 0061                   sts       DISPLAY_DIGIT, TEMP_REG_A
                                    
-00000a e003                        ldi       TEMP_REG_A, 3
+00000a e001                        ldi       TEMP_REG_A, 1
 00000b 9300 0062                   sts       DISPLAY_DIGIT+1, TEMP_REG_A
                                  
-00000d e002                        ldi       TEMP_REG_A, 2
+00000d e009                        ldi       TEMP_REG_A, 9
 00000e 9300 0063                   sts       DISPLAY_DIGIT+2, TEMP_REG_A
                                  
 000010 e001                        ldi       TEMP_REG_A, 1
 000011 9300 0064                   sts       DISPLAY_DIGIT+3, TEMP_REG_A
                                  
 000013 2411                        clr       r1
-000014 e8e6                        ldi	      ZL,LOW(2*DISPLAY_SYMBOLS)
+000014 ebea                        ldi	      ZL,LOW(2*DISPLAY_SYMBOLS)
 000015 e0f0                      	ldi	      ZH,HIGH(2*DISPLAY_SYMBOLS)
                                  
 000016 c00a                        rjmp      LOOP
@@ -875,9 +875,8 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  ;========================================;
                                  
                                  LOOP:
-000021 d01c                        rcall     TOGGLE_POWER_LED
+000021 d036                        rcall     TOGGLE_POWER_LED
 000022 d001                        rcall     DISPLAY_INDICATE
-                                   ; rcall     USI_TRANSMIT
                                  
                                    ; ldi       TEMP_REG_B, 10
                                    ; cp        r1, TEMP_REG_B
@@ -904,58 +903,81 @@ firmware.asm(14): Including file 'tn2313Adef.inc'
                                  
                                  DISPLAY_INDICATE:
 000024 9a92                        sbi       PORTD, DIGIT_1_PIN
-000025 d008                        rcall     DELAY
-000026 9892                        cbi       PORTD, DIGIT_1_PIN
+000025 9100 0064                   lds       TEMP_REG_A, DISPLAY_DIGIT+3
+000027 d019                        rcall     DISPLAY_DECODER
+000028 dfee                        rcall     USI_TRANSMIT
+000029 d01e                        rcall     DELAY
+00002a 9892                        cbi       PORTD, DIGIT_1_PIN
                                  
-000027 9a93                        sbi       PORTD, DIGIT_2_PIN
-000028 d005                        rcall     DELAY
-000029 9893                        cbi       PORTD, DIGIT_2_PIN
+00002b 9a93                        sbi       PORTD, DIGIT_2_PIN
+00002c 9100 0063                   lds       TEMP_REG_A, DISPLAY_DIGIT+2
+00002e d012                        rcall     DISPLAY_DECODER
+00002f dfe7                        rcall     USI_TRANSMIT
+000030 d017                        rcall     DELAY
+000031 9893                        cbi       PORTD, DIGIT_2_PIN
                                  
-00002a 9a94                        sbi       PORTD, DIGIT_3_PIN
-00002b d002                        rcall     DELAY
-00002c 9894                        cbi       PORTD, DIGIT_3_PIN
+000032 9a94                        sbi       PORTD, DIGIT_3_PIN
+000033 9100 0062                   lds       TEMP_REG_A, DISPLAY_DIGIT+1
+000035 d00b                        rcall     DISPLAY_DECODER
+000036 dfe0                        rcall     USI_TRANSMIT
+000037 d010                        rcall     DELAY
+000038 9894                        cbi       PORTD, DIGIT_3_PIN
                                  
-                                   ; sbi       PORTD, DIGIT_4_PIN
-                                   ; rcall     DELAY
-                                   ; cbi       PORTD, DIGIT_4_PIN
-00002d 9508                      ret
+000039 9a95                        sbi       PORTD, DIGIT_4_PIN
+00003a 9100 0061                   lds       TEMP_REG_A, DISPLAY_DIGIT
+00003c d004                        rcall     DISPLAY_DECODER
+00003d dfd9                        rcall     USI_TRANSMIT
+00003e d009                        rcall     DELAY
+00003f 9895                        cbi       PORTD, DIGIT_4_PIN
+000040 9508                      ret
+                                 
+                                 DISPLAY_DECODER:
+000041 ebea                        ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
+000042 e0f0                      	ldi	      ZH, HIGH(2*DISPLAY_SYMBOLS)
+                                 
+000043 e010                        ldi       TEMP_REG_B, 0
+000044 0fe0                        add       ZL, TEMP_REG_A
+000045 1ff1                        adc       ZH, TEMP_REG_B
+                                 
+000046 95c8                        lpm
+000047 9508                      ret
                                  
                                  DELAY:
-00002e 930f                        push      r16
-00002f 931f                        push      r17
-000030 94f8                        cli
-000031 e604                        ldi       r16, 100
+000048 930f                        push      r16
+000049 931f                        push      r17
+00004a 94f8                        cli
+00004b e302                        ldi       r16, 50
                                    _DELAY_1:
-000032 ef1f                          ldi     r17, 255   
+00004c ef1f                          ldi     r17, 255   
                                    _DELAY_2:
-000033 951a                          dec     r17         
-000034 0000                          nop                 
-000035 0000                          nop                
-000036 0000                          nop                 
-000037 f7d9                          brne    _DELAY_2    
+00004d 951a                          dec     r17         
+00004e 0000                          nop                 
+00004f 0000                          nop                
+000050 0000                          nop                 
+000051 f7d9                          brne    _DELAY_2    
                                  
-000038 950a                          dec     r16
-000039 f7c1                          brne    _DELAY_1    
-00003a 9478                        sei
+000052 950a                          dec     r16
+000053 f7c1                          brne    _DELAY_1    
+000054 9478                        sei
                                  
-00003b 911f                        pop       r17
-00003c 910f                        pop       r16
-00003d 9508                      ret                    
+000055 911f                        pop       r17
+000056 910f                        pop       r16
+000057 9508                      ret                    
                                  
                                  TOGGLE_POWER_LED:
-00003e e400                        ldi       r16,   (1<<LED_POWER_PIN)
-00003f b312                        in        r17,   PORTD
-000040 2710                        eor       r17,   r16
-000041 bb12                        out       PORTD, r17
-000042 9508                      ret
+000058 e400                        ldi       r16,   (1<<LED_POWER_PIN)
+000059 b312                        in        r17,   PORTD
+00005a 2710                        eor       r17,   r16
+00005b bb12                        out       PORTD, r17
+00005c 9508                      ret
                                  
                                  DISPLAY_SYMBOLS:
                                        ; HGFEDCBA    HGFEDCBA
-000043 f9c0                        .DB 0b11000000, 0b11111001          ; 0, 1
-000044 b0a4                        .DB 0b10100100, 0b10110000          ; 2, 3
-000045 9299                        .DB 0b10011001, 0b10010010          ; 4, 5
-000046 f882                        .DB 0b10000010, 0b11111000          ; 6, 7
-000047 9080                        .DB 0b10000000, 0b10010000          ; 8, 9
+00005d f9c0                        .DB 0b11000000, 0b11111001          ; 0, 1
+00005e b0a4                        .DB 0b10100100, 0b10110000          ; 2, 3
+00005f 9299                        .DB 0b10011001, 0b10010010          ; 4, 5
+000060 f882                        .DB 0b10000010, 0b11111000          ; 6, 7
+000061 9080                        .DB 0b10000000, 0b10010000          ; 8, 9
                                  
                                  ;========================================;
                                  ;             EEPROM SEGMENT             ;
@@ -1031,36 +1053,36 @@ counted separately from r26..r31 here.
 "ATtiny2313A" register use summary:
 x  :   0 y  :   0 z  :   0 r0 :   1 r1 :   1 r2 :   0 r3 :   0 r4 :   0 
 r5 :   0 r6 :   0 r7 :   0 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 
-r13:   0 r14:   0 r15:   0 r16:  24 r17:   7 r18:   0 r19:   0 r20:   0 
+r13:   0 r14:   0 r15:   0 r16:  29 r17:   9 r18:   0 r19:   0 r20:   0 
 r21:   0 r22:   0 r23:   0 r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 
-r29:   0 r30:   1 r31:   1 
+r29:   0 r30:   3 r31:   3 
 Registers used: 6 out of 35 (17.1%)
 
 "ATtiny2313A" instruction use summary:
-.lds  :   0 .sts  :   0 adc   :   0 add   :   0 adiw  :   0 and   :   0 
+.lds  :   0 .sts  :   0 adc   :   1 add   :   1 adiw  :   0 and   :   0 
 andi  :   0 asr   :   0 bclr  :   0 bld   :   0 brbc  :   0 brbs  :   0 
 brcc  :   0 brcs  :   0 break :   0 breq  :   0 brge  :   0 brhc  :   0 
 brhs  :   0 brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 
 brne  :   2 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0 
-brvs  :   0 bset  :   0 bst   :   0 cbi   :   4 cbr   :   0 clc   :   0 
+brvs  :   0 bset  :   0 bst   :   0 cbi   :   5 cbr   :   0 clc   :   0 
 clh   :   0 cli   :   1 cln   :   0 clr   :   1 cls   :   0 clt   :   0 
 clv   :   0 clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   0 
 cpse  :   0 dec   :   2 eor   :   1 icall :   0 ijmp  :   0 in    :   1 
-inc   :   0 ld    :   0 ldd   :   0 ldi   :  14 lds   :   0 lpm   :   0 
+inc   :   0 ld    :   0 ldd   :   0 ldi   :  17 lds   :   4 lpm   :   3 
 lsl   :   0 lsr   :   0 mov   :   0 movw  :   0 neg   :   0 nop   :   3 
-or    :   0 ori   :   0 out   :   7 pop   :   2 push  :   2 rcall :   5 
-ret   :   4 reti  :   0 rjmp  :   4 rol   :   0 ror   :   0 sbc   :   0 
-sbci  :   0 sbi   :   4 sbic  :   0 sbis  :   1 sbiw  :   0 sbr   :   0 
+or    :   0 ori   :   0 out   :   7 pop   :   2 push  :   2 rcall :  14 
+ret   :   5 reti  :   0 rjmp  :   4 rol   :   0 ror   :   0 sbc   :   0 
+sbci  :   0 sbi   :   5 sbic  :   0 sbis  :   1 sbiw  :   0 sbr   :   0 
 sbrc  :   0 sbrs  :   0 sec   :   0 seh   :   0 sei   :   1 sen   :   0 
 ser   :   0 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 
 spm   :   0 st    :   0 std   :   0 sts   :   4 sub   :   0 subi  :   0 
 swap  :   0 tst   :   0 wdr   :   0 
-Instructions used: 19 out of 105 (18.1%)
+Instructions used: 23 out of 105 (21.9%)
 
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x000090    134     10    144    2048   7.0%
+[.cseg] 0x000000 0x0000c4    186     10    196    2048   9.6%
 [.dseg] 0x000060 0x000065      0      5      5     128   3.9%
 [.eseg] 0x000000 0x000033      0     51     51     128  39.8%
 

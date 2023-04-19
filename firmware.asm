@@ -110,13 +110,13 @@ MCU_INIT:
   ; sbi       PORTD, PD4
   ; sbi       PORTD, PD5
 
-  ldi       TEMP_REG_A, 4
+  ldi       TEMP_REG_A, 1
   sts       DISPLAY_DIGIT, TEMP_REG_A
   
-  ldi       TEMP_REG_A, 3
+  ldi       TEMP_REG_A, 1
   sts       DISPLAY_DIGIT+1, TEMP_REG_A
 
-  ldi       TEMP_REG_A, 2
+  ldi       TEMP_REG_A, 9
   sts       DISPLAY_DIGIT+2, TEMP_REG_A
 
   ldi       TEMP_REG_A, 1
@@ -173,7 +173,6 @@ ret
 LOOP:
   rcall     TOGGLE_POWER_LED
   rcall     DISPLAY_INDICATE
-  ; rcall     USI_TRANSMIT
 
   ; ldi       TEMP_REG_B, 10
   ; cp        r1, TEMP_REG_B
@@ -200,27 +199,50 @@ LOOP:
 
 DISPLAY_INDICATE:
   sbi       PORTD, DIGIT_1_PIN
+  lds       TEMP_REG_A, DISPLAY_DIGIT+3
+  rcall     DISPLAY_DECODER
+  rcall     USI_TRANSMIT
   rcall     DELAY
   cbi       PORTD, DIGIT_1_PIN
 
   sbi       PORTD, DIGIT_2_PIN
+  lds       TEMP_REG_A, DISPLAY_DIGIT+2
+  rcall     DISPLAY_DECODER
+  rcall     USI_TRANSMIT
   rcall     DELAY
   cbi       PORTD, DIGIT_2_PIN
 
   sbi       PORTD, DIGIT_3_PIN
+  lds       TEMP_REG_A, DISPLAY_DIGIT+1
+  rcall     DISPLAY_DECODER
+  rcall     USI_TRANSMIT
   rcall     DELAY
   cbi       PORTD, DIGIT_3_PIN
 
   sbi       PORTD, DIGIT_4_PIN
+  lds       TEMP_REG_A, DISPLAY_DIGIT
+  rcall     DISPLAY_DECODER
+  rcall     USI_TRANSMIT
   rcall     DELAY
   cbi       PORTD, DIGIT_4_PIN
+ret
+
+DISPLAY_DECODER:
+  ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
+	ldi	      ZH, HIGH(2*DISPLAY_SYMBOLS)
+
+  ldi       TEMP_REG_B, 0
+  add       ZL, TEMP_REG_A
+  adc       ZH, TEMP_REG_B
+
+  lpm
 ret
 
 DELAY:
   push      r16
   push      r17
   cli
-  ldi       r16, 100
+  ldi       r16, 50
   _DELAY_1:
     ldi     r17, 255   
   _DELAY_2:
