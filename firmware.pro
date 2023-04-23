@@ -1,7 +1,7 @@
 /avr_sim_project_file
 /home/sergeyyarkov/Documents/Projects/Firmwares/AVR/attiny2313a_thermostat/firmware.asm
 mainasm=firmware.asm
-file=firmware.lst,122,33,48
+file=firmware.lst,349,62,73
 file=firmware.asm,1,1,1
 file=div16u.asm,1,1,1
 file=usi.asm,1,1,1

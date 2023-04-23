@@ -29,22 +29,26 @@
 
 ;***** Code
 
-div16u:	clr	drem16uL	;clear remainder Low byte
-	sub	drem16uH,drem16uH;clear remainder High byte and carry
-	ldi	dcnt16u,17	;init loop counter
-d16u_1:	rol	dd16uL		;shift left dividend
-	rol	dd16uH
-	dec	dcnt16u		;decrement counter
-	brne	d16u_2		;if done
-	ret			;    return
-d16u_2:	rol	drem16uL	;shift dividend into remainder
-	rol	drem16uH
-	sub	drem16uL,dv16uL	;remainder = remainder - divisor
-	sbc	drem16uH,dv16uH	;
-	brcc	d16u_3		;if result negative
-	add	drem16uL,dv16uL	;    restore remainder
-	adc	drem16uH,dv16uH
-	clc			;    clear carry to be shifted into result
-	rjmp	d16u_1		;else
-d16u_3:	sec			;    set carry to be shifted into result
-	rjmp	d16u_1
+div16u:
+	clr			drem16uL								; clear remainder Low byte
+	sub			drem16uH,drem16uH				; clear remainder High byte and carry
+	ldi			dcnt16u,17							; init loop counter
+d16u_1:	
+	rol			dd16uL									; shift left dividend
+	rol			dd16uH
+	dec			dcnt16u									; decrement counter
+	brne		d16u_2									; if done
+	ret															; return
+d16u_2:	
+	rol			drem16uL								; shift dividend into remainder
+	rol			drem16uH
+	sub			drem16uL,dv16uL					; remainder = remainder - divisor
+	sbc			drem16uH,dv16uH
+	brcc		d16u_3									; if result negative
+	add			drem16uL,dv16uL					; restore remainder
+	adc			drem16uH,dv16uH
+	clc															; clear carry to be shifted into result
+	rjmp		d16u_1									; else
+d16u_3:	
+	sec															; set carry to be shifted into result
+	rjmp		d16u_1
