@@ -16,6 +16,7 @@
 
 .DEF TEMP_REG_A               = r16
 .DEF TEMP_REG_B               = r17
+.DEF ONE_WIRE_FLAGS           = r23         ; Флаги состояния для 1-Wire интерфейса
 .DEF DISP_NUM_L               = r24         ; LSB числа которое сейчас на индикаторе
 .DEF DISP_NUM_H               = r25         ; MSB числа которое сейчас на индикаторе
 
@@ -25,6 +26,11 @@
 .EQU DIGIT_4_PIN              = PD5         ; Пин разряда индикатора 4
 
 .EQU LED_POWER_PIN            = PD6         ; Светодиод, который говорит о том что питание подано
+
+.EQU ONE_WIRE_LINE            = PB1         ; Пин шины 1-Wire
+.EQU ONE_WIRE_DDR             = DDRB
+.EQU ONE_WIRE_PIN             = PINB
+.EQU OWPRF                    = 0           ; 1-Wire Флаг присутствия
 
 .EQU USI_LATCH_PIN            = PB0         ; ST_CP на 74HC595
 .EQU USI_DO_PIN               = PB6         ; DS на 74HC595
@@ -47,6 +53,14 @@
 .MACRO display_load
   ldi   DISP_NUM_L,    LOW(@0)
   ldi   DISP_NUM_H,    HIGH(@0)
+.ENDMACRO
+
+.MACRO _1_wire_pull
+  sbi       ONE_WIRE_DDR, ONE_WIRE_LINE
+.ENDMACRO
+
+.MACRO _1_wire_release
+  cbi       ONE_WIRE_DDR, ONE_WIRE_LINE
 .ENDMACRO
 
 ; **** СЕГМЕНТ ДАННЫХ ********************************************
@@ -75,7 +89,9 @@ CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда инди
 TIMER0_COMPA_vect:
   push      r20
   push      r21
+  push      r16
   in r21, SREG
+
   lds       r20,  CURRENT_DIGIT
   cpi       r20,  5
   brge      reset_digit_idx
@@ -137,13 +153,39 @@ TIMER0_COMPA_vect:
     inc       r20
     sts       CURRENT_DIGIT, r20
     out SREG, r21
+    
+    pop r16
     pop r21
     pop r20
 reti
 
 ; **** ОБРАБОТКА КНОПОК ******************************************
 PCINT0_vect:
-  adiw        DISP_NUM_L, 1
+  push r16
+  in r16, SREG
+
+  sbis PINB, SW_PLUS_PIN
+  rjmp _sw_plus
+
+  sbis PINB, SW_MINUS_PIN
+  rjmp _sw_minus
+
+  sbis PINB, SW_SET_PIN
+  rjmp _sw_set
+
+  rjmp _sw_exit
+  _sw_plus:
+    adiw        DISP_NUM_L, 1
+    rjmp        _sw_exit
+  _sw_minus:
+    adiw        DISP_NUM_L, 10
+    rjmp        _sw_exit
+  _sw_set:
+    adiw        DISP_NUM_L, 63
+  _sw_exit:
+
+  out SREG, r16
+  pop r16
 reti
 
 ; **** СТАРТ ПРОГРАММЫ *******************************************
@@ -154,7 +196,7 @@ RESET_vect:
 ; **** ПРОЦЕСС ИНИЦИАЛИЗАЦИИ МК **********************************
 MCU_INIT:
   ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
-  outi      r16, DDRD, (1<<LED_POWER_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN)
+  outi      r16, DDRD, (1<<LED_POWER_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (0<<PD0) | (1<<PD1)
   outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN)
   outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
 
@@ -162,39 +204,104 @@ MCU_INIT:
   outi      r16, GIMSK, (1<<PCIE0)
   outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; прерывание для кнопок на нажатие
   
-  ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРОВ **********************************
+  ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 **********************************
   outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
   outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
   outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
   outi      r16, TIMSK, (1<<OCIE0A)             ; включение прерывания по совпадению
 
+  ; **** ИНИЦИАЛИЗАЦИЯ USART *************************************
+  ; outi      r16, UBRRL, LOW(3)                 ; 9600 БОД
+  ; outi      r16, UBRRH, HIGH(3)                ; 9600 БОД
+  ; outi      r16, UCSRB, (1<<RXEN) | (1<<TXEN)   ; Включение приема и передачии
+  ; outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0) ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+
   clr       r1
   sts   CURRENT_DIGIT, r1
 
   display_load 0                       ; загружаем число, которое нужно показать на индикатор
+  rcall ONE_WIRE_RESET                 ; проверяем наличие датчика на шине путем выполнения процедуры сброса
   sei
 
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
 LOOP:
-  rcall       DISPLAY_UPD_DIGITS          ; получаем из этого числа цифры путем деления и распределяем их по ячейкам в SRAM
-  rcall       TOGGLE_POWER_LED
-  rcall       DELAY
-  rcall       DELAY
-  rcall       DELAY
-  rcall       DELAY
-  rcall       DELAY
-  rcall       DELAY
+  rcall       DISPLAY_UPD_DIGITS       ; получаем из этого числа цифры путем деления и распределяем их по ячейкам в SRAM
   
+  ; usart_t:
+  ; sbis        UCSRA, UDRE
+  ; rjmp        usart_t
+  ; ldi         r16, 'B'
+  ; out         UDR, r16
+
+  ; usart_r:
+  ;   sbis UCSRA, RXC
+  ;   rjmp usart_r
+  ; in DISP_NUM_L, UDR
+
+  sbrc ONE_WIRE_FLAGS, OWPRF
+  sbi PORTD, PD6
+
+  sbrs ONE_WIRE_FLAGS, OWPRF
+  cbi PORTD, PD6
+
+  ; rcall       DELAY
+  ; rcall       DELAY
+  ; rcall       DELAY
+  ; rcall       DELAY
+  ; rcall       DELAY
+  ; rcall       DELAY
+
   rjmp      LOOP
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
 .INCLUDE "usi.asm"
 
+; **** ПРОВЕРКА ДАТЧИКА НА ШИНЕ ***************************************************
+ONE_WIRE_RESET:
+  ; 62 тика
+  outi      r16, TCNT1L, 131
+  outi      r16, OCR1AL, 193
+  outi      r16, OCR1BL, 201
+
+  ; запуск таймера в режиме Normal
+  outi      r16, TCCR1B, (1<<CS11) | (1<<CS10)
+
+s1: _1_wire_pull                      ; Шаг 1. притягиваем шину, ждем минимум 480мкс, отпускаем шину. 
+    in r16, TIFR
+    sbrs r16, OCF1A
+    rjmp  s1
+    _1_wire_release
+s2: in r16, TIFR                      ; Шаг 2. Ждем где то 60-70мкс и проверяем есть ли устройство на шине, и если есть то устанавливаем флаг.
+    sbrs r16, OCF1B
+    rjmp s2
+    rcall OCF1B_occured
+s3: clr r16                           ; Шаг 3. Останавливаем таймер.
+    out TCCR1B, r16
+; s3: in r16, TIFR
+    ; sbrs r16, TOV1
+    ; rjmp s3
+    ; rcall TOV1_occured
+    ; ser r16
+    ; out TIFR, r16
+ret
+
+OCF1B_occured:
+  sbis ONE_WIRE_PIN, ONE_WIRE_LINE
+  rjmp _got_presence
+  _no_presence:
+    cbr ONE_WIRE_FLAGS, (1<<OWPRF)
+    rjmp _ex
+  _got_presence:
+    sbr ONE_WIRE_FLAGS, (1<<OWPRF)
+  _ex:
+ret
+
 ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *********************
 ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
 ;           путем деления этого числа несколько раз
 DISPLAY_UPD_DIGITS:
+  push  r21
   ldi   r21,    4                     ; максимум 4 цифры, т.к индикатор четырех разрядный
   ldi   XL, LOW(DIGITS)
   ldi   XH, HIGH(DIGITS)
@@ -224,10 +331,13 @@ DISPLAY_UPD_DIGITS:
 
     dec   r21                         ; декрементируем счетчик цикла
     brne  DIV_LOOP                    ; делим еще раз если не 0
+  pop   r21
 ret
 
 ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
 DISPLAY_DECODER:
+  push      r16
+  push      r17
   ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
 	ldi	      ZH, HIGH(2*DISPLAY_SYMBOLS)
 
@@ -236,26 +346,21 @@ DISPLAY_DECODER:
   adc       ZH, TEMP_REG_B
 
   lpm       r0, Z
+  pop       r17
+  pop       r16
 ret
 
+DELAY_68us:
+  ldi r16, 179                ; 1
+  _d1_loop:     
+    dec r16                   ; 1
+    brne _d1_loop             ; 2/1
+ret                           ; 4
+
 DELAY:
-  ; cli                          
-  ; push r24
-  ; push r25
-
-  ; .equ c1 = 50000
-  ; ldi r24, LOW(c1)
-  ; ldi r25, HIGH(c1)
-  ; _d_loop:
-  ; sbiw r24, 1
-  ; brne _d_loop
-
-  ; pop r25
-  ; pop r24
-  ; sei
-
   push      r16
   push      r17
+
   ldi       r16, 255
   _DELAY_1:
     ldi     r17, 255   
@@ -272,17 +377,6 @@ DELAY:
   pop       r17
   pop       r16
 ret                    
-
-TOGGLE_POWER_LED:
-  push      r16
-  push      r17
-  ldi       r16,   (1<<LED_POWER_PIN)
-  in        r17,   PORTD
-  eor       r17,   r16
-  out       PORTD, r17
-  pop       r17
-  pop       r16
-ret
 
 DISPLAY_SYMBOLS:
       ; HGFEDCBA    HGFEDCBA

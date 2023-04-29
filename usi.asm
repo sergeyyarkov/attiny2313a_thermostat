@@ -1,6 +1,7 @@
 ; **** ОТПРАВКА БАЙТА В СДВИГОВЫЙ РЕГИСТР *************************
 USI_TRANSMIT:
-  out       USIDR, r0            ; Move byte from temp register to USI Data Register
+  push      r16
+  out       USIDR, r0            ; Байт для отправки всегда находится в регистре r0. Помещаем данные в регистр USIDR.
 
   ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
   ldi       TEMP_REG_A, (1<<USIOIF)      
@@ -25,4 +26,5 @@ USI_TRANSMIT:
   ; This will copy byte from 74hc595 shift register into 74hc595 storage register
   sbi      PORTB, USI_LATCH_PIN
   cbi      PORTB, USI_LATCH_PIN
+  pop      r16
 ret
