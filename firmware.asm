@@ -14,35 +14,48 @@
 .INCLUDE "tn2313Adef.inc"
 .LIST
 
-.DEF TEMP_REG_A               = r16
-.DEF TEMP_REG_B               = r17
-.DEF ONE_WIRE_FLAGS           = r23         ; Флаги состояния для 1-Wire интерфейса
-.DEF DISP_NUM_L               = r24         ; LSB числа которое сейчас на индикаторе
-.DEF DISP_NUM_H               = r25         ; MSB числа которое сейчас на индикаторе
+.DEF TEMP_REG_A                 = r16
+.DEF TEMP_REG_B                 = r17
+.DEF ONE_WIRE_FLAGS             = r23         ; Флаги состояния для 1-Wire интерфейса
+.DEF DISP_NUM_L                 = r24         ; LSB числа которое сейчас на индикаторе
+.DEF DISP_NUM_H                 = r25         ; MSB числа которое сейчас на индикаторе
 
-.EQU DIGIT_1_PIN              = PD2         ; Пин разряда индикатора 1
-.EQU DIGIT_2_PIN              = PD3         ; Пин разряда индикатора 2
-.EQU DIGIT_3_PIN              = PD4         ; Пин разряда индикатора 3
-.EQU DIGIT_4_PIN              = PD5         ; Пин разряда индикатора 4
+.EQU DIGIT_1_PIN                = PD2         ; Пин разряда индикатора 1
+.EQU DIGIT_2_PIN                = PD3         ; Пин разряда индикатора 2
+.EQU DIGIT_3_PIN                = PD4         ; Пин разряда индикатора 3
+.EQU DIGIT_4_PIN                = PD5         ; Пин разряда индикатора 4
 
-.EQU LED_POWER_PIN            = PD6         ; Светодиод, который говорит о том что питание подано
+.EQU LED_POWER_PIN              = PD6         ; Светодиод, который говорит о том что питание подано
 
-.EQU ONE_WIRE_LINE            = PB1         ; Пин шины 1-Wire
-.EQU ONE_WIRE_DDR             = DDRB
-.EQU ONE_WIRE_PIN             = PINB
-.EQU OWPRF                    = 0           ; 1-Wire Флаг присутствия
+.EQU ONE_WIRE_LINE              = PB1         ; Пин шины 1-Wire
+.EQU ONE_WIRE_DDR               = DDRB
+.EQU ONE_WIRE_PIN               = PINB
+.EQU OWPRF                      = 0           ; 1-Wire Флаг присутствия
 
-.EQU USI_LATCH_PIN            = PB0         ; ST_CP на 74HC595
-.EQU USI_DO_PIN               = PB6         ; DS на 74HC595
-.EQU USI_CLK_PIN              = PB7         ; SH_CP на 74HC595
+; **** КОМАНДЫ ДАТЧИКА *****************************************
+.EQU DS18B20_CMD_CONVERTTEMP    = 0x44
+.EQU DS18B20_CMD_RSCRATCHPAD    = 0xbe
+.EQU DS18B20_CMD_WSCRATCHPAD    = 0x4e
+.EQU DS18B20_CMD_CPYSCRATCHPAD  = 0x48
+.EQU DS18B20_CMD_RECEEPROM      = 0xb8
+.EQU DS18B20_CMD_RPWRSUPPLY     = 0xb4
+.EQU DS18B20_CMD_SEARCHROM      = 0xf0
+.EQU DS18B20_CMD_READROM        = 0x33
+.EQU DS18B20_CMD_MATCHROM       = 0x55
+.EQU DS18B20_CMD_SKIPROM        = 0xcc
+.EQU DS18B20_CMD_ALARMSEARCH    = 0xec
 
-.EQU SW_PLUS_PIN              = PB2         ; Кнопка "Минус"
-.EQU SW_MINUS_PIN             = PB3         ; Кнопка "Плюс"
-.EQU SW_SET_PIN               = PB4         ; Кнопка "Установить"
+.EQU USI_LATCH_PIN              = PB0         ; ST_CP на 74HC595
+.EQU USI_DO_PIN                 = PB6         ; DS на 74HC595
+.EQU USI_CLK_PIN                = PB7         ; SH_CP на 74HC595
 
-.EQU MCU_STATE_DEFAULT        = 0x01        ; Режим измерения температуры и сравнения с заданными параметрами
-.EQU MCU_STATE_PROGRAM        = 0x02        ; Режим настройки параметров в EEPROM
-.EQU MCU_STATE_ERROR          = 0x03        ; Режим ошибки, например когда не подключен датчик
+.EQU SW_PLUS_PIN                = PB2         ; Кнопка "Минус"
+.EQU SW_MINUS_PIN               = PB3         ; Кнопка "Плюс"
+.EQU SW_SET_PIN                 = PB4         ; Кнопка "Установить"
+
+.EQU MCU_STATE_DEFAULT          = 0x01        ; Режим измерения температуры и сравнения с заданными параметрами
+.EQU MCU_STATE_PROGRAM          = 0x02        ; Режим настройки параметров в EEPROM
+.EQU MCU_STATE_ERROR            = 0x03        ; Режим ошибки, например когда не подключен датчик
 
 ; **** МАКРОСЫ **************************************************
 .MACRO outi
@@ -220,7 +233,7 @@ MCU_INIT:
   sts   CURRENT_DIGIT, r1
 
   display_load 0                       ; загружаем число, которое нужно показать на индикатор
-  rcall ONE_WIRE_RESET                 ; проверяем наличие датчика на шине путем выполнения процедуры сброса
+  rcall _1_WIRE_DETECT_PRESENCE        ; проверяем наличие датчика на шине путем выполнения процедуры сброса
   sei
 
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
@@ -257,44 +270,59 @@ LOOP:
 .INCLUDE "div16u.asm"
 .INCLUDE "usi.asm"
 
-; **** ПРОВЕРКА ДАТЧИКА НА ШИНЕ ***************************************************
-ONE_WIRE_RESET:
-  ; 62 тика
-  outi      r16, TCNT1L, 131
-  outi      r16, OCR1AL, 193
-  outi      r16, OCR1BL, 201
+; **** ОПРОС ПРИСУТСТВИЯ УСТРОЙСТВА ******************************
+_1_WIRE_DETECT_PRESENCE:
+  cli                                   ; Шаг 1. выключаем глобальные прерывания
 
-  ; запуск таймера в режиме Normal
+  ; 62 тика
+  outi      r16, TCNT1L, 0
+  outi      r16, OCR1AL, 60           ; 480 мкс
+  outi      r16, OCR1BL, 69           ; 72 мкс
+
+  ; предделитель 64
   outi      r16, TCCR1B, (1<<CS11) | (1<<CS10)
 
-s1: _1_wire_pull                      ; Шаг 1. притягиваем шину, ждем минимум 480мкс, отпускаем шину. 
-    in r16, TIFR
-    sbrs r16, OCF1A
-    rjmp  s1
-    _1_wire_release
-s2: in r16, TIFR                      ; Шаг 2. Ждем где то 60-70мкс и проверяем есть ли устройство на шине, и если есть то устанавливаем флаг.
-    sbrs r16, OCF1B
-    rjmp s2
-    rcall OCF1B_occured
-s3: clr r16                           ; Шаг 3. Останавливаем таймер.
-    out TCCR1B, r16
-; s3: in r16, TIFR
-    ; sbrs r16, TOV1
-    ; rjmp s3
-    ; rcall TOV1_occured
-    ; ser r16
-    ; out TIFR, r16
+  S1: _1_wire_pull                      ; Шаг 2. притягиваем шину
+      in r16, TIFR
+      sbrs r16, OCF1A                   ; Шаг 3. ждем минимум 480мкс
+      rjmp  S1                          
+      _1_wire_release                   ; Шаг 4. отпускаем шину
+  S2: in r16, TIFR
+      sbrs r16, OCF1B                   ; Шаг 5. ждем +- 70мкс
+      rjmp S2
+      rcall _1_WIRE_CHECK_PRESENCE      ; Шаг 6. проверяем есть ли устройство на шине, и если есть то устанавливаем флаг
+  
+  outi      r16, TCNT1L, 0
+  outi      r16, OCR1AL, 52         ; 416 мкс
+  S3: 
+      in r16, TIFR
+      sbrs r16, OCF1A
+      rjmp S3  
+      clr r16                           
+      out TCCR1B, r16
+      ser r16
+      out TIFR, r16
+  ; s3: in r16, TIFR
+      ; sbrs r16, TOV1
+      ; rjmp s3
+      ; rcall TOV1_occured
+      ; ser r16
+      ; out TIFR, r16
+  sei
 ret
 
-OCF1B_occured:
+; **** ПРОВЕРКА НАЛИЧИЯ УСТРОЙСТВА *******************************
+; Если подчиненное устройство притянет шину, то устанавливаем флаг OWPRF в единицу в регистре флагов
+;
+_1_WIRE_CHECK_PRESENCE:
   sbis ONE_WIRE_PIN, ONE_WIRE_LINE
-  rjmp _got_presence
-  _no_presence:
-    cbr ONE_WIRE_FLAGS, (1<<OWPRF)
-    rjmp _ex
-  _got_presence:
-    sbr ONE_WIRE_FLAGS, (1<<OWPRF)
-  _ex:
+  sbr ONE_WIRE_FLAGS, (1<<OWPRF)
+ret
+
+_1_WIRE_SEND_BIT:
+  cli
+
+  sei
 ret
 
 ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *********************

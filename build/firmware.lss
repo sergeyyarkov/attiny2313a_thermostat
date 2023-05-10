@@ -1,20 +1,20 @@
 
-AVRASM ver. 2.2.7  firmware.asm Sat Apr 29 03:25:47 2023
+AVRASM ver. 2.2.7  firmware.asm Wed May 10 21:22:23 2023
 
 firmware.asm(14): Including file 'tn2313Adef.inc'
-firmware.asm(257): Including file 'div16u.asm'
+firmware.asm(270): Including file 'div16u.asm'
 div16u.asm(22): warning: Register r16 already defined by the .DEF directive
-firmware.asm(257): 'div16u.asm' included form here
+firmware.asm(270): 'div16u.asm' included form here
 div16u.asm(23): warning: Register r17 already defined by the .DEF directive
-firmware.asm(257): 'div16u.asm' included form here
+firmware.asm(270): 'div16u.asm' included form here
 div16u.asm(24): warning: Register r16 already defined by the .DEF directive
-firmware.asm(257): 'div16u.asm' included form here
+firmware.asm(270): 'div16u.asm' included form here
 div16u.asm(25): warning: Register r17 already defined by the .DEF directive
-firmware.asm(257): 'div16u.asm' included form here
-firmware.asm(258): Including file 'usi.asm'
+firmware.asm(270): 'div16u.asm' included form here
+firmware.asm(271): Including file 'usi.asm'
 firmware.asm(14): Including file 'tn2313Adef.inc'
-firmware.asm(257): Including file 'div16u.asm'
-firmware.asm(258): Including file 'usi.asm'
+firmware.asm(270): Including file 'div16u.asm'
+firmware.asm(271): Including file 'usi.asm'
                                  
                                  
                                  ; Project name: thermostat
@@ -730,35 +730,48 @@ firmware.asm(258): Including file 'usi.asm'
                                  ; ***** END OF FILE ******************************************************
                                  .LIST
                                  
-                                 .DEF TEMP_REG_A               = r16
-                                 .DEF TEMP_REG_B               = r17
-                                 .DEF ONE_WIRE_FLAGS           = r23         ; Флаги состояния для 1-Wire интерфейса
-                                 .DEF DISP_NUM_L               = r24         ; LSB числа которое сейчас на индикаторе
-                                 .DEF DISP_NUM_H               = r25         ; MSB числа которое сейчас на индикаторе
+                                 .DEF TEMP_REG_A                 = r16
+                                 .DEF TEMP_REG_B                 = r17
+                                 .DEF ONE_WIRE_FLAGS             = r23         ; Флаги состояния для 1-Wire интерфейса
+                                 .DEF DISP_NUM_L                 = r24         ; LSB числа которое сейчас на индикаторе
+                                 .DEF DISP_NUM_H                 = r25         ; MSB числа которое сейчас на индикаторе
                                  
-                                 .EQU DIGIT_1_PIN              = PD2         ; Пин разряда индикатора 1
-                                 .EQU DIGIT_2_PIN              = PD3         ; Пин разряда индикатора 2
-                                 .EQU DIGIT_3_PIN              = PD4         ; Пин разряда индикатора 3
-                                 .EQU DIGIT_4_PIN              = PD5         ; Пин разряда индикатора 4
+                                 .EQU DIGIT_1_PIN                = PD2         ; Пин разряда индикатора 1
+                                 .EQU DIGIT_2_PIN                = PD3         ; Пин разряда индикатора 2
+                                 .EQU DIGIT_3_PIN                = PD4         ; Пин разряда индикатора 3
+                                 .EQU DIGIT_4_PIN                = PD5         ; Пин разряда индикатора 4
                                  
-                                 .EQU LED_POWER_PIN            = PD6         ; Светодиод, который говорит о том что питание подано
+                                 .EQU LED_POWER_PIN              = PD6         ; Светодиод, который говорит о том что питание подано
                                  
-                                 .EQU ONE_WIRE_LINE            = PB1         ; Пин шины 1-Wire
-                                 .EQU ONE_WIRE_DDR             = DDRB
-                                 .EQU ONE_WIRE_PIN             = PINB
-                                 .EQU OWPRF                    = 0           ; 1-Wire Флаг присутствия
+                                 .EQU ONE_WIRE_LINE              = PB1         ; Пин шины 1-Wire
+                                 .EQU ONE_WIRE_DDR               = DDRB
+                                 .EQU ONE_WIRE_PIN               = PINB
+                                 .EQU OWPRF                      = 0           ; 1-Wire Флаг присутствия
                                  
-                                 .EQU USI_LATCH_PIN            = PB0         ; ST_CP на 74HC595
-                                 .EQU USI_DO_PIN               = PB6         ; DS на 74HC595
-                                 .EQU USI_CLK_PIN              = PB7         ; SH_CP на 74HC595
+                                 ; **** КОМАНДЫ ДАТЧИКА *****************************************
+                                 .EQU DS18B20_CMD_CONVERTTEMP    = 0x44
+                                 .EQU DS18B20_CMD_RSCRATCHPAD    = 0xbe
+                                 .EQU DS18B20_CMD_WSCRATCHPAD    = 0x4e
+                                 .EQU DS18B20_CMD_CPYSCRATCHPAD  = 0x48
+                                 .EQU DS18B20_CMD_RECEEPROM      = 0xb8
+                                 .EQU DS18B20_CMD_RPWRSUPPLY     = 0xb4
+                                 .EQU DS18B20_CMD_SEARCHROM      = 0xf0
+                                 .EQU DS18B20_CMD_READROM        = 0x33
+                                 .EQU DS18B20_CMD_MATCHROM       = 0x55
+                                 .EQU DS18B20_CMD_SKIPROM        = 0xcc
+                                 .EQU DS18B20_CMD_ALARMSEARCH    = 0xec
                                  
-                                 .EQU SW_PLUS_PIN              = PB2         ; Кнопка "Минус"
-                                 .EQU SW_MINUS_PIN             = PB3         ; Кнопка "Плюс"
-                                 .EQU SW_SET_PIN               = PB4         ; Кнопка "Установить"
+                                 .EQU USI_LATCH_PIN              = PB0         ; ST_CP на 74HC595
+                                 .EQU USI_DO_PIN                 = PB6         ; DS на 74HC595
+                                 .EQU USI_CLK_PIN                = PB7         ; SH_CP на 74HC595
                                  
-                                 .EQU MCU_STATE_DEFAULT        = 0x01        ; Режим измерения температуры и сравнения с заданными параметрами
-                                 .EQU MCU_STATE_PROGRAM        = 0x02        ; Режим настройки параметров в EEPROM
-                                 .EQU MCU_STATE_ERROR          = 0x03        ; Режим ошибки, например когда не подключен датчик
+                                 .EQU SW_PLUS_PIN                = PB2         ; Кнопка "Минус"
+                                 .EQU SW_MINUS_PIN               = PB3         ; Кнопка "Плюс"
+                                 .EQU SW_SET_PIN                 = PB4         ; Кнопка "Установить"
+                                 
+                                 .EQU MCU_STATE_DEFAULT          = 0x01        ; Режим измерения температуры и сравнения с заданными параметрами
+                                 .EQU MCU_STATE_PROGRAM          = 0x02        ; Режим настройки параметров в EEPROM
+                                 .EQU MCU_STATE_ERROR            = 0x03        ; Режим ошибки, например когда не подключен датчик
                                  
                                  ; **** МАКРОСЫ **************************************************
                                  .MACRO outi
@@ -826,7 +839,7 @@ firmware.asm(258): Including file 'usi.asm'
 00001e 9895                          cbi       PORTD, DIGIT_4_PIN
 00001f 9a92                          sbi       PORTD, DIGIT_1_PIN
 000020 9100 0066                     lds       TEMP_REG_A, DIGITS+3
-000022 d0aa                          rcall     DISPLAY_DECODER
+000022 d0b5                          rcall     DISPLAY_DECODER
 000023 d06b                          rcall     USI_TRANSMIT
                                  
                                    _indicate_2:
@@ -838,7 +851,7 @@ firmware.asm(258): Including file 'usi.asm'
 000028 9895                          cbi       PORTD, DIGIT_4_PIN
 000029 9a93                          sbi       PORTD, DIGIT_2_PIN
 00002a 9100 0065                     lds       TEMP_REG_A, DIGITS+2
-00002c d0a0                          rcall     DISPLAY_DECODER
+00002c d0ab                          rcall     DISPLAY_DECODER
 00002d d061                          rcall     USI_TRANSMIT
                                  
                                    _indicate_3:
@@ -850,7 +863,7 @@ firmware.asm(258): Including file 'usi.asm'
 000032 9895                          cbi       PORTD, DIGIT_4_PIN
 000033 9a94                          sbi       PORTD, DIGIT_3_PIN
 000034 9100 0064                     lds       TEMP_REG_A, DIGITS+1
-000036 d096                          rcall     DISPLAY_DECODER
+000036 d0a1                          rcall     DISPLAY_DECODER
 000037 d057                          rcall     USI_TRANSMIT
                                  
                                    _indicate_4:
@@ -862,7 +875,7 @@ firmware.asm(258): Including file 'usi.asm'
 00003c 9894                          cbi       PORTD, DIGIT_3_PIN
 00003d 9a95                          sbi       PORTD, DIGIT_4_PIN
 00003e 9100 0063                     lds       TEMP_REG_A, DIGITS
-000040 d08c                          rcall     DISPLAY_DECODER
+000040 d097                          rcall     DISPLAY_DECODER
 000041 d04d                          rcall     USI_TRANSMIT
                                  
                                    _indicate_exit:
@@ -946,12 +959,12 @@ firmware.asm(258): Including file 'usi.asm'
                                  
 000072 e080
 000073 e090                        display_load 0                       ; загружаем число, которое нужно показать на индикатор
-000074 d026                        rcall ONE_WIRE_RESET                 ; проверяем наличие датчика на шине путем выполнения процедуры сброса
+000074 d026                        rcall _1_WIRE_DETECT_PRESENCE        ; проверяем наличие датчика на шине путем выполнения процедуры сброса
 000075 9478                        sei
                                  
                                  ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
                                  LOOP:
-000076 d03e                        rcall       DISPLAY_UPD_DIGITS       ; получаем из этого числа цифры путем деления и распределяем их по ячейкам в SRAM
+000076 d049                        rcall       DISPLAY_UPD_DIGITS       ; получаем из этого числа цифры путем деления и распределяем их по ячейкам в SRAM
                                    
                                    ; usart_t:
                                    ; sbis        UCSRA, UDRE
@@ -1065,140 +1078,157 @@ firmware.asm(258): Including file 'usi.asm'
 000098 98c0                        cbi      PORTB, USI_LATCH_PIN
 000099 910f                        pop      r16
 00009a 9508                      
-                                 ; **** ПРОВЕРКА ДАТЧИКА НА ШИНЕ ***************************************************
-                                 ONE_WIRE_RESET:
+                                 ; **** ОПРОС ПРИСУТСТВИЯ УСТРОЙСТВА ******************************
+                                 _1_WIRE_DETECT_PRESENCE:
+00009b 94f8                        cli                                   ; Шаг 1. выключаем глобальные прерывания
+                                 
                                    ; 62 тика
-00009b e803
-00009c bd0c                        outi      r16, TCNT1L, 131
-00009d ec01
-00009e bd0a                        outi      r16, OCR1AL, 193
-00009f ec09
-0000a0 bd08                        outi      r16, OCR1BL, 201
+00009c e000
+00009d bd0c                        outi      r16, TCNT1L, 0
+00009e e30c
+00009f bd0a                        outi      r16, OCR1AL, 60           ; 480 мкс
+0000a0 e405
+0000a1 bd08                        outi      r16, OCR1BL, 69           ; 72 мкс
                                  
-                                   ; запуск таймера в режиме Normal
-0000a1 e003
-0000a2 bd0e                        outi      r16, TCCR1B, (1<<CS11) | (1<<CS10)
+                                   ; предделитель 64
+0000a2 e003
+0000a3 bd0e                        outi      r16, TCCR1B, (1<<CS11) | (1<<CS10)
                                  
-0000a3 9ab9                      s1: _1_wire_pull                      ; Шаг 1. притягиваем шину, ждем минимум 480мкс, отпускаем шину. 
-0000a4 b708                          in r16, TIFR
-0000a5 ff06                          sbrs r16, OCF1A
-0000a6 cffc                          rjmp  s1
-0000a7 98b9                          _1_wire_release
-0000a8 b708                      s2: in r16, TIFR                      ; Шаг 2. Ждем где то 60-70мкс и проверяем есть ли устройство на шине, и если есть то устанавливаем флаг.
-0000a9 ff05                          sbrs r16, OCF1B
-0000aa cffd                          rjmp s2
-0000ab d003                          rcall OCF1B_occured
-0000ac 2700                      s3: clr r16                           ; Шаг 3. Останавливаем таймер.
-0000ad bd0e                          out TCCR1B, r16
-                                 ; s3: in r16, TIFR
-                                     ; sbrs r16, TOV1
-                                     ; rjmp s3
-                                     ; rcall TOV1_occured
-                                     ; ser r16
-                                     ; out TIFR, r16
-0000ae 9508                      ret
+0000a4 9ab9                        S1: _1_wire_pull                      ; Шаг 2. притягиваем шину
+0000a5 b708                            in r16, TIFR
+0000a6 ff06                            sbrs r16, OCF1A                   ; Шаг 3. ждем минимум 480мкс
+0000a7 cffc                            rjmp  S1                          
+0000a8 98b9                            _1_wire_release                   ; Шаг 4. отпускаем шину
+0000a9 b708                        S2: in r16, TIFR
+0000aa ff05                            sbrs r16, OCF1B                   ; Шаг 5. ждем +- 70мкс
+0000ab cffd                            rjmp S2
+0000ac d00d                            rcall _1_WIRE_CHECK_PRESENCE      ; Шаг 6. проверяем есть ли устройство на шине, и если есть то устанавливаем флаг
+                                   
+0000ad e000
+0000ae bd0c                        outi      r16, TCNT1L, 0
+0000af e304
+0000b0 bd0a                        outi      r16, OCR1AL, 52         ; 416 мкс
+                                   S3: 
+0000b1 b708                            in r16, TIFR
+0000b2 ff06                            sbrs r16, OCF1A
+0000b3 cffd                            rjmp S3  
+0000b4 2700                            clr r16                           
+0000b5 bd0e                            out TCCR1B, r16
+0000b6 ef0f                            ser r16
+0000b7 bf08                            out TIFR, r16
+                                   ; s3: in r16, TIFR
+                                       ; sbrs r16, TOV1
+                                       ; rjmp s3
+                                       ; rcall TOV1_occured
+                                       ; ser r16
+                                       ; out TIFR, r16
+0000b8 9478                        sei
+0000b9 9508                      ret
                                  
-                                 OCF1B_occured:
-0000af 9bb1                        sbis ONE_WIRE_PIN, ONE_WIRE_LINE
-0000b0 c002                        rjmp _got_presence
-                                   _no_presence:
-0000b1 7f7e                          cbr ONE_WIRE_FLAGS, (1<<OWPRF)
-0000b2 c001                          rjmp _ex
-                                   _got_presence:
-0000b3 6071                          sbr ONE_WIRE_FLAGS, (1<<OWPRF)
-                                   _ex:
-0000b4 9508                      ret
+                                 ; **** ПРОВЕРКА НАЛИЧИЯ УСТРОЙСТВА *******************************
+                                 ; Если подчиненное устройство притянет шину, то устанавливаем флаг OWPRF в единицу в регистре флагов
+                                 ;
+                                 _1_WIRE_CHECK_PRESENCE:
+0000ba 9bb1                        sbis ONE_WIRE_PIN, ONE_WIRE_LINE
+0000bb 6071                        sbr ONE_WIRE_FLAGS, (1<<OWPRF)
+0000bc 9508                      ret
+                                 
+                                 _1_WIRE_SEND_BIT:
+0000bd 94f8                        cli
+                                 
+0000be 9478                        sei
+0000bf 9508                      ret
                                  
                                  ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *********************
                                  ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
                                  ;           путем деления этого числа несколько раз
                                  DISPLAY_UPD_DIGITS:
-0000b5 935f                        push  r21
-0000b6 e054                        ldi   r21,    4                     ; максимум 4 цифры, т.к индикатор четырех разрядный
-0000b7 e6a3                        ldi   XL, LOW(DIGITS)
-0000b8 e0b0                        ldi   XH, HIGH(DIGITS)
+0000c0 935f                        push  r21
+0000c1 e054                        ldi   r21,    4                     ; максимум 4 цифры, т.к индикатор четырех разрядный
+0000c2 e6a3                        ldi   XL, LOW(DIGITS)
+0000c3 e0b0                        ldi   XH, HIGH(DIGITS)
                                  
                                    .equ  dividend      = SRAM_TEMP_1
                                    .equ  divisor       = 10
                                  
                                    ; загружаем число которое хотим поделить в адрес SRAM делимого
-0000b9 9380 0061                   sts   dividend,     DISP_NUM_L
-0000bb 9390 0062                   sts   dividend+1,   DISP_NUM_H
+0000c4 9380 0061                   sts   dividend,     DISP_NUM_L
+0000c6 9390 0062                   sts   dividend+1,   DISP_NUM_H
                                  
                                    ; четыре раза производим деление для получения остатков
                                    DIV_LOOP:
                                      ; заполняем нужные регистры
-0000bd 9100 0061                     lds   dd16uL, dividend
-0000bf 9110 0062                     lds   dd16uH, dividend+1
-0000c1 e02a                          ldi   dv16uL, LOW(divisor)
-0000c2 e030                          ldi   dv16uH, HIGH(divisor)
+0000c8 9100 0061                     lds   dd16uL, dividend
+0000ca 9110 0062                     lds   dd16uH, dividend+1
+0000cc e02a                          ldi   dv16uL, LOW(divisor)
+0000cd e030                          ldi   dv16uH, HIGH(divisor)
                                      
-0000c3 dfb8                          rcall div16u                      ; делим
+0000ce dfad                          rcall div16u                      ; делим
                                  
-0000c4 92ed                          st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю
+0000cf 92ed                          st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю
                                  
                                      ; обновляем делимое
-0000c5 9300 0061                     sts  dividend,   dres16uL
-0000c7 9310 0062                     sts  dividend+1, dres16uH
+0000d0 9300 0061                     sts  dividend,   dres16uL
+0000d2 9310 0062                     sts  dividend+1, dres16uH
                                  
-0000c9 955a                          dec   r21                         ; декрементируем счетчик цикла
-0000ca f791                          brne  DIV_LOOP                    ; делим еще раз если не 0
-0000cb 915f                        pop   r21
-0000cc 9508                      ret
+0000d4 955a                          dec   r21                         ; декрементируем счетчик цикла
+0000d5 f791                          brne  DIV_LOOP                    ; делим еще раз если не 0
+0000d6 915f                        pop   r21
+0000d7 9508                      ret
                                  
                                  ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
                                  DISPLAY_DECODER:
-0000cd 930f                        push      r16
-0000ce 931f                        push      r17
-0000cf ede4                        ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
-0000d0 e0f1                      	ldi	      ZH, HIGH(2*DISPLAY_SYMBOLS)
+0000d8 930f                        push      r16
+0000d9 931f                        push      r17
+0000da eeea                        ldi	      ZL, LOW(2*DISPLAY_SYMBOLS)
+0000db e0f1                      	ldi	      ZH, HIGH(2*DISPLAY_SYMBOLS)
                                  
-0000d1 2711                        clr       TEMP_REG_B
-0000d2 0fe0                        add       ZL, TEMP_REG_A
-0000d3 1ff1                        adc       ZH, TEMP_REG_B
+0000dc 2711                        clr       TEMP_REG_B
+0000dd 0fe0                        add       ZL, TEMP_REG_A
+0000de 1ff1                        adc       ZH, TEMP_REG_B
                                  
-0000d4 9004                        lpm       r0, Z
-0000d5 911f                        pop       r17
-0000d6 910f                        pop       r16
-0000d7 9508                      ret
+0000df 9004                        lpm       r0, Z
+0000e0 911f                        pop       r17
+0000e1 910f                        pop       r16
+0000e2 9508                      ret
                                  
                                  DELAY_68us:
-0000d8 eb03                        ldi r16, 179                ; 1
+0000e3 eb03                        ldi r16, 179                ; 1
                                    _d1_loop:     
-0000d9 950a                          dec r16                   ; 1
-0000da f7f1                          brne _d1_loop             ; 2/1
-0000db 9508                      ret                           ; 4
+0000e4 950a                          dec r16                   ; 1
+0000e5 f7f1                          brne _d1_loop             ; 2/1
+0000e6 9508                      ret                           ; 4
                                  
                                  DELAY:
-0000dc 930f                        push      r16
-0000dd 931f                        push      r17
+0000e7 930f                        push      r16
+0000e8 931f                        push      r17
                                  
-0000de ef0f                        ldi       r16, 255
+0000e9 ef0f                        ldi       r16, 255
                                    _DELAY_1:
-0000df ef1f                          ldi     r17, 255   
+0000ea ef1f                          ldi     r17, 255   
                                    _DELAY_2:
-0000e0 951a                          dec     r17         
-0000e1 0000                          nop                 
-0000e2 0000                          nop                
-0000e3 0000                          nop                 
-0000e4 f7d9                          brne    _DELAY_2    
+0000eb 951a                          dec     r17         
+0000ec 0000                          nop                 
+0000ed 0000                          nop                
+0000ee 0000                          nop                 
+0000ef f7d9                          brne    _DELAY_2    
                                  
-0000e5 950a                          dec     r16
-0000e6 f7c1                          brne    _DELAY_1    
+0000f0 950a                          dec     r16
+0000f1 f7c1                          brne    _DELAY_1    
                                  
-0000e7 911f                        pop       r17
-0000e8 910f                        pop       r16
-0000e9 9508                      ret                    
+0000f2 911f                        pop       r17
+0000f3 910f                        pop       r16
+0000f4 9508                      ret                    
                                  
                                  DISPLAY_SYMBOLS:
                                        ; HGFEDCBA    HGFEDCBA
-0000ea f9c0                        .DB 0b11000000, 0b11111001          ; 0, 1
-0000eb b0a4                        .DB 0b10100100, 0b10110000          ; 2, 3
-0000ec 9299                        .DB 0b10011001, 0b10010010          ; 4, 5
-0000ed f882                        .DB 0b10000010, 0b11111000          ; 6, 7
-0000ee 9080                        .DB 0b10000000, 0b10010000          ; 8, 9
-firmware.asm(388): warning: .cseg .db misalignment - padding zero byte
-0000ef 009c                        .DB 0b10011100                      ; °
+0000f5 f9c0                        .DB 0b11000000, 0b11111001          ; 0, 1
+0000f6 b0a4                        .DB 0b10100100, 0b10110000          ; 2, 3
+0000f7 9299                        .DB 0b10011001, 0b10010010          ; 4, 5
+0000f8 f882                        .DB 0b10000010, 0b11111000          ; 6, 7
+0000f9 9080                        .DB 0b10000000, 0b10010000          ; 8, 9
+firmware.asm(416): warning: .cseg .db misalignment - padding zero byte
+0000fa 009c                        .DB 0b10011100                      ; °
                                  
                                  ; **** СЕГМЕНТ EEPROM ********************************************
                                  ; .ESEG
@@ -1221,8 +1251,8 @@ counted separately from r26..r31 here.
 "ATtiny2313A" register use summary:
 x  :   1 y  :   0 z  :   1 r0 :   2 r1 :   2 r2 :   0 r3 :   0 r4 :   0 
 r5 :   0 r6 :   0 r7 :   0 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 
-r13:   0 r14:   5 r15:   5 r16:  62 r17:  11 r18:   3 r19:   3 r20:  14 
-r21:   8 r22:   0 r23:   4 r24:   5 r25:   2 r26:   1 r27:   1 r28:   0 
+r13:   0 r14:   5 r15:   5 r16:  70 r17:  11 r18:   3 r19:   3 r20:  14 
+r21:   8 r22:   0 r23:   3 r24:   5 r25:   2 r26:   1 r27:   1 r28:   0 
 r29:   0 r30:   2 r31:   2 
 Registers used: 19 out of 35 (54.3%)
 
@@ -1232,25 +1262,25 @@ andi  :   0 asr   :   0 bclr  :   0 bld   :   0 brbc  :   0 brbs  :   0
 brcc  :   1 brcs  :   0 break :   0 breq  :   0 brge  :   1 brhc  :   0 
 brhs  :   0 brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 
 brne  :   9 brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0 
-brvs  :   0 bset  :   0 bst   :   0 cbi   :  15 cbr   :   1 clc   :   1 
-clh   :   0 cli   :   0 cln   :   0 clr   :   5 cls   :   0 clt   :   0 
+brvs  :   0 bset  :   0 bst   :   0 cbi   :  15 cbr   :   0 clc   :   1 
+clh   :   0 cli   :   2 cln   :   0 clr   :   5 cls   :   0 clt   :   0 
 clv   :   0 clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   5 
-cpse  :   0 dec   :   5 eor   :   0 icall :   0 ijmp  :   0 in    :   4 
-inc   :   1 ld    :   0 ldd   :   0 ldi   :  29 lds   :   7 lpm   :   2 
+cpse  :   0 dec   :   5 eor   :   0 icall :   0 ijmp  :   0 in    :   5 
+inc   :   1 ld    :   0 ldd   :   0 ldi   :  31 lds   :   7 lpm   :   2 
 lsl   :   0 lsr   :   0 mov   :   0 movw  :   0 neg   :   0 nop   :   3 
-or    :   0 ori   :   0 out   :  20 pop   :  10 push  :  10 rcall :  12 
-ret   :   8 reti  :   2 rjmp  :  18 rol   :   4 ror   :   0 sbc   :   1 
+or    :   0 ori   :   0 out   :  23 pop   :  10 push  :  10 rcall :  12 
+ret   :   9 reti  :   2 rjmp  :  17 rol   :   4 ror   :   0 sbc   :   1 
 sbci  :   0 sbi   :   7 sbic  :   0 sbis  :   5 sbiw  :   0 sbr   :   1 
-sbrc  :   1 sbrs  :   3 sec   :   1 seh   :   0 sei   :   1 sen   :   0 
-ser   :   0 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 
+sbrc  :   1 sbrs  :   4 sec   :   1 seh   :   0 sei   :   3 sen   :   0 
+ser   :   1 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 
 spm   :   0 st    :   1 std   :   0 sts   :   7 sub   :   2 subi  :   0 
 swap  :   0 tst   :   0 wdr   :   0 
-Instructions used: 37 out of 105 (35.2%)
+Instructions used: 38 out of 105 (36.2%)
 
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x0001e0    446     12    458    2048  22.4%
+[.cseg] 0x000000 0x0001f6    468     12    480    2048  23.4%
 [.dseg] 0x000060 0x000068      0      8      8     128   6.3%
 [.eseg] 0x000000 0x000000      0      0      0     128   0.0%
 
