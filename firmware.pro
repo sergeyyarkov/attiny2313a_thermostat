@@ -1,12 +1,12 @@
 /avr_sim_project_file
 /home/sergeyyarkov/Documents/Projects/Firmwares/AVR/attiny2313a_thermostat/firmware.asm
 mainasm=firmware.asm
-file=firmware.lst,265,35,266
+file=firmware.lst,345,35,266
 file=firmware.asm,1,1,1
 file=div16u.asm,1,1,1
 file=usi.asm,1,1,1
 clock=8000000
 device-type=ATtiny2313A
 device-package=20-pin-PDIP_SOIC
-windows=acePSTwz
+windows=acepSTwz
 alert1=0,0,-1,-1,,0,0

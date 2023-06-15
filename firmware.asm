@@ -16,7 +16,6 @@
 
 .DEF TEMP_REG_A                 = r16
 .DEF TEMP_REG_B                 = r17
-.DEF ONE_WIRE_FLAGS             = r23         ; Флаги состояния для 1-Wire интерфейса
 .DEF DISP_NUM_L                 = r24         ; LSB числа которое сейчас на индикаторе
 .DEF DISP_NUM_H                 = r25         ; MSB числа которое сейчас на индикаторе
 
@@ -30,7 +29,9 @@
 .EQU ONE_WIRE_LINE              = PB1         ; Пин шины 1-Wire
 .EQU ONE_WIRE_DDR               = DDRB
 .EQU ONE_WIRE_PIN               = PINB
+.DEF ONE_WIRE_FLAGS             = r23         ; Флаги состояния для 1-Wire интерфейса
 .EQU OWPRF                      = 0           ; 1-Wire Флаг присутствия
+.EQU OWSB                       = 1           ; Флаг передачи одного бита
 
 ; **** КОМАНДЫ ДАТЧИКА *****************************************
 .EQU DS18B20_CMD_CONVERTTEMP    = 0x44
@@ -49,6 +50,8 @@
 .EQU USI_DO_PIN                 = PB6         ; DS на 74HC595
 .EQU USI_CLK_PIN                = PB7         ; SH_CP на 74HC595
 
+.EQU SW_PORT                    = PORTB
+.EQU SW_PIN                     = PINB
 .EQU SW_PLUS_PIN                = PB2         ; Кнопка "Минус"
 .EQU SW_MINUS_PIN               = PB3         ; Кнопка "Плюс"
 .EQU SW_SET_PIN                 = PB4         ; Кнопка "Установить"
@@ -84,6 +87,7 @@ MCU_STATE:      .BYTE 1                     ; Текущее состояние 
 SRAM_TEMP_1:    .BYTE 2                     ; Хранения временного 16-бит числа в ячейке
 DIGITS:         .BYTE 4                     ; Ячейки, где хранятся символы, для вывода на индикатор
 CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
+PC_HISTORY:     .BYTE 1                     ; История изменений состояния кнопок (необходимо для прерываня по изменению состояния пина)
 
 ; **** СЕГМЕНТ КОДА **********************************************
 .CSEG
@@ -107,10 +111,10 @@ TIMER0_COMPA_vect:
 
   lds       r20,  CURRENT_DIGIT
   cpi       r20,  5
-  brge      reset_digit_idx
+  brge      _CLR_CURRENT_DIGIT          ; сброс активного разряда если >= 5
   rjmp      _indicate_1
 
-  reset_digit_idx:
+  _CLR_CURRENT_DIGIT:                   ; сброс текущего активного разряда в ноль
     clr     r20
     sts     CURRENT_DIGIT, r20
 
@@ -174,31 +178,58 @@ reti
 
 ; **** ОБРАБОТКА КНОПОК ******************************************
 PCINT0_vect:
-  push r16
-  in r16, SREG
+  push 		r16
+  push 		r17
+	push		r18
+	push		r19
 
-  sbis PINB, SW_PLUS_PIN
-  rjmp _sw_plus
+  in 			r16, 	SREG
+	
+	in 			r17,	SW_PIN
+	lds			r18,	PC_HISTORY
+	
+	eor			r17,	r18
+	in			r19,  SW_PIN
+	sts			PC_HISTORY, r19
 
-  sbis PINB, SW_MINUS_PIN
-  rjmp _sw_minus
+	_SW_PLUS_CHECK:
+	sbrs		r17, SW_PLUS_PIN
+	rjmp		_SW_EXIT
+	rjmp		_SW_PLUS_HANDLER
 
-  sbis PINB, SW_SET_PIN
-  rjmp _sw_set
+	_SW_PLUS_HANDLER:
+		; rcall				DEBOUNCE_SW
+		sbis				SW_PIN,		SW_PLUS_PIN
+		adiw        DISP_NUM_L, 1
+		;exit
 
-  rjmp _sw_exit
-  _sw_plus:
-    adiw        DISP_NUM_L, 1
-    rjmp        _sw_exit
-  _sw_minus:
-    adiw        DISP_NUM_L, 10
-    rjmp        _sw_exit
-  _sw_set:
-    adiw        DISP_NUM_L, 63
-  _sw_exit:
 
-  out SREG, r16
-  pop r16
+  ; sbis PINB, SW_PLUS_PIN
+  ; rjmp _sw_plus
+
+  ; sbis PINB, SW_MINUS_PIN
+  ; rjmp _sw_minus
+
+  ; sbis PINB, SW_SET_PIN
+  ; rjmp _sw_set
+
+  ; rjmp _sw_exit
+  ; _sw_plus:
+  ;   adiw        DISP_NUM_L, 1
+  ;   rjmp        _sw_exit
+  ; _sw_minus:
+  ;   adiw        DISP_NUM_L, 10
+  ;   rjmp        _sw_exit
+  ; _sw_set:
+  ;   adiw        DISP_NUM_L, 63
+  ; _sw_exit:
+
+	_SW_EXIT:
+  out 		SREG, r16
+	pop 		r19
+	pop			r18
+	pop			r17
+  pop 		r16
 reti
 
 ; **** СТАРТ ПРОГРАММЫ *******************************************
@@ -230,10 +261,10 @@ MCU_INIT:
   ; outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0) ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
 
   clr       r1
-  sts   CURRENT_DIGIT, r1
+  sts       CURRENT_DIGIT,  r1
 
   display_load 0                       ; загружаем число, которое нужно показать на индикатор
-  rcall _1_WIRE_DETECT_PRESENCE        ; проверяем наличие датчика на шине путем выполнения процедуры сброса
+  ; rcall _1_WIRE_DETECT_PRESENCE        ; проверяем наличие датчика на шине путем выполнения процедуры сброса
   sei
 
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
@@ -251,18 +282,19 @@ LOOP:
   ;   rjmp usart_r
   ; in DISP_NUM_L, UDR
 
-  sbrc ONE_WIRE_FLAGS, OWPRF
-  sbi PORTD, PD6
+  ; sbrc ONE_WIRE_FLAGS, OWPRF
+  ; sbi PORTD, PD6
 
-  sbrs ONE_WIRE_FLAGS, OWPRF
-  cbi PORTD, PD6
+  ; sbrs ONE_WIRE_FLAGS, OWPRF
+  ; cbi PORTD, PD6
 
-  ; rcall       DELAY
-  ; rcall       DELAY
-  ; rcall       DELAY
-  ; rcall       DELAY
-  ; rcall       DELAY
-  ; rcall       DELAY
+	sbi PORTD, PD6
+
+  rcall       DEBOUNCE_SW
+
+	cbi PORTD, PD6
+
+	rcall       DEBOUNCE_SW
 
   rjmp      LOOP
 
@@ -282,7 +314,9 @@ _1_WIRE_DETECT_PRESENCE:
   ; предделитель 64
   outi      r16, TCCR1B, (1<<CS11) | (1<<CS10)
 
-  S1: _1_wire_pull                      ; Шаг 2. притягиваем шину
+  _1_wire_pull                          ; Шаг 2. притягиваем шину
+
+  S1:
       in r16, TIFR
       sbrs r16, OCF1A                   ; Шаг 3. ждем минимум 480мкс
       rjmp  S1                          
@@ -319,23 +353,58 @@ _1_WIRE_CHECK_PRESENCE:
   sbr ONE_WIRE_FLAGS, (1<<OWPRF)
 ret
 
-_1_WIRE_SEND_BIT:
-  cli
+_1_WIRE_SEND_BYTE:
+  push r17
+  ldi r17, DS18B20_CMD_READROM
+  ldi r16, 8
+  _s_l:
+    ; rol r16
+    ; brcc
+  pop r17
+ret
 
+.DEF TRANSMIT_BIT = r9
+_1_WIRE_SEND_BIT:
+  push r16
+  cli
+  sbr ONE_WIRE_FLAGS, (1<<OWSB)
+  outi      r16, TCNT1L, 0
+  outi      r16, OCR1AL, 1            ; 8 мкс
+  outi      r16, OCR1BL, 9           ; 64 мкс
+  
+  _1_wire_pull
+  SB_1:
+    in r16, TIFR
+    sbrs r16, OCF1A
+    rjmp SB_1
+    sbrc TRANSMIT_BIT, 0
+    _1_wire_release
+  SB_2:
+    in r16, TIFR
+    sbrs r16, OCF1B
+    rjmp SB_2
+
+  clr r16                           
+  out TCCR1B, r16
+  cbr ONE_WIRE_FLAGS, (1<<OWSB)
   sei
+  pop r16
 ret
 
 ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *********************
 ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
 ;           путем деления этого числа несколько раз
 DISPLAY_UPD_DIGITS:
+  cli
   push  r21
-  ldi   r21,    4                     ; максимум 4 цифры, т.к индикатор четырех разрядный
+  ldi   r21,    4                     ; (4 раза делим) т.к индикатор четырех разрядный
+  
+  ; инициализация указателя (за каждый проход цикла будет инкрементироваться)
   ldi   XL, LOW(DIGITS)
   ldi   XH, HIGH(DIGITS)
 
-  .equ  dividend      = SRAM_TEMP_1
-  .equ  divisor       = 10
+  .equ  dividend      = SRAM_TEMP_1   ; число которе будем делить
+  .equ  divisor       = 10            ; на что делим
 
   ; загружаем число которое хотим поделить в адрес SRAM делимого
   sts   dividend,     DISP_NUM_L
@@ -351,7 +420,7 @@ DISPLAY_UPD_DIGITS:
     
     rcall div16u                      ; делим
 
-    st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю
+    st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю и увеличиваем его
 
     ; обновляем делимое
     sts  dividend,   dres16uL
@@ -360,6 +429,7 @@ DISPLAY_UPD_DIGITS:
     dec   r21                         ; декрементируем счетчик цикла
     brne  DIV_LOOP                    ; делим еще раз если не 0
   pop   r21
+  sei
 ret
 
 ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
@@ -378,12 +448,30 @@ DISPLAY_DECODER:
   pop       r16
 ret
 
-DELAY_68us:
-  ldi r16, 179                ; 1
-  _d1_loop:     
-    dec r16                   ; 1
-    brne _d1_loop             ; 2/1
-ret                           ; 4
+DEBOUNCE_SW:
+  push    r16
+  push    r17
+	push		r18
+
+	ldi			r18, 5
+	_loop_2:
+  ldi     r17, 255
+  _loop_0:
+    ldi     r16, 255
+    _dec_0:
+    dec     r16
+    brne    _dec_0
+  _loop_1:
+    dec     r17
+    brne    _loop_0
+	_loop_3:
+		dec			r18
+		brne		_loop_2
+
+	pop r18
+  pop r17
+  pop r16
+ret
 
 DELAY:
   push      r16
