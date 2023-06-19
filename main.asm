@@ -27,7 +27,8 @@ DIGITS:         .BYTE 4                     ; Ячейки, где хранят�
 CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
 SW_FLAGS:       .BYTE 1                     ; Состояние кнопок
 HYSTERESIS:     .BYTE 1                     ; Отклонение температуры от уставки
-OW_RECEIVE:	.BYTE 1
+TEMP_L:		.BYTE 1
+TEMP_H:		.BYTE 1
 ;//</editor-fold>
 
 
@@ -152,43 +153,12 @@ MCU_INIT:
     sts       MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
     
     clr	    r16
-    sts	    OW_RECEIVE, r16
+    sts	    TEMP_L, r16
+    sts	    TEMP_H, r16
 
     display_load 0			    ; загружаем число, которое нужно показать на индикатор
-    
-;    ldi	    r16, 0b10000000
-;    lsr	    r16
-;    sbr r16, (1<<7)
-    
-;    sbrc	OWFR, OWPRF
-    
-;    ldi		r16, DS18B20_CMD_SKIPROM
-;    mov		r8, r16
-;    rcall	OW_PRESENCE
-;    rcall	OW_SEND_BYTE
-;           
-;    ldi		r16, DS18B20_CMD_RSCRATCHPAD
-;    mov		r8, r16
-;;;    rcall	OW_PRESENCE
-;    rcall	OW_SEND_BYTE
-;    
-;    rcall	OW_RD_BYTE
-;;    rcall	OW_RD_BYTE
-;    rcall	TEMP_CONV
-;    rcall	OW_PRESENCE
-    
-    rcall	TEMP_CONV
-    
-    rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
-    
-    rcall	TEMP_RD
-    
-
-    
-    lds		r16, OW_RECEIVE
+            
+    lds		r16, TEMP_L
     mov		DISP_NUM_L, r16
     ldi		DISP_NUM_H, 0
     
@@ -206,20 +176,21 @@ _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
     rcall	DISPLAY_UPD_DIGITS
-;    rcall	TEMP_RD
     sbrc	OWFR, OWPRF
     sbi		PORTD, PD6
     sbrs	OWFR, OWPRF
     cbi		PORTD, PD6
+    
     rcall	TEMP_CONV
     rcall	DEBOUNCE_SW
     rcall	DEBOUNCE_SW
     rcall	DEBOUNCE_SW
     rcall	DEBOUNCE_SW
     rcall	TEMP_RD
-    lds		r17, OW_RECEIVE
+    lds		r17, TEMP_L
     mov		DISP_NUM_L, r17
-    ldi		DISP_NUM_H, 0
+    lds		r17, TEMP_H
+    mov		DISP_NUM_H, r17
 
 _STATE_PROGRAM:
     cpi       r16, MCU_STATE_PROGRAM
@@ -252,6 +223,8 @@ DELAY_LOOP_16:
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: чтение и опрос температуры">
 TEMP_RD:
     push	r16
+    push	r17
+    push	r18
     cli
     
     rcall	OW_PRESENCE
@@ -263,9 +236,33 @@ TEMP_RD:
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
     
+    ldi		XL, LOW(TEMP_L)
+    ldi		XH, HIGH(TEMP_L)
     rcall	OW_RD_BYTE
     
+    ldi		XL, LOW(TEMP_H)
+    ldi		XH, HIGH(TEMP_H)
+    rcall	OW_RD_BYTE
+    
+    lds		r17, TEMP_L
+    lds		r18, TEMP_H
+    
+    lsr r18
+    ror r17
+    lsr r18
+    ror r17
+    lsr r18
+    ror r17
+    lsr r18
+    ror r17
+    
+    sts		TEMP_L, r17
+    sts		TEMP_H, r18
+
+    
     sei
+    pop		r18
+    pop		r17
     pop		r16
     ret
 ;    
@@ -362,7 +359,7 @@ _EXIT:
 //<editor-fold defaultstate="collapsed" desc="1-Wire: отправка байта">
 OW_SEND_BYTE:
     push    r16
-    push    r17
+    push    r17    
     mov	    r16, OW_CMD_r
     ldi	    r17, 8
 _OW_SEND_BYTE_LOOP:
@@ -392,20 +389,20 @@ _OW_SEND_BYTE_END:
 OW_RD_BYTE:
     push    r16
     push    r17
-    ldi	    r16, 8
+    clr	    r16
+    ldi	    r17, 8
 _OW_RD_BYTE_LP:
+    lsr	    r16
     ow_pull
     DELAY16	6
     ow_release
     DELAY16	9
-    lds	    r17, OW_RECEIVE
-    lsr	    r17
     sbic    OW_PIN, OW_LINE
-    sbr	    r17, (1<<7)
-    sts	    OW_RECEIVE, r17
+    sbr	    r16, (1<<7)
     DELAY16	55
-    dec	    r16
+    dec	    r17
     brne    _OW_RD_BYTE_LP
+    st	    X, r16
     pop	    r17
     pop	    r16
     ret

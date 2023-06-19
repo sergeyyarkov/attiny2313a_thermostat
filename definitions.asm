@@ -1,4 +1,4 @@
-.EQU F_CPU			= 8		; 8 Mhz   
+.EQU F_CPU			= 8		; 8 Mhz (для задержки)   
  
 .DEF TEMP_REG_A                 = r16
 .DEF TEMP_REG_B                 = r17
