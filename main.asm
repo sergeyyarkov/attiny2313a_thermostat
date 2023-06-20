@@ -27,8 +27,9 @@ DIGITS:         .BYTE 4                     ; Ячейки, где хранят�
 CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
 SW_FLAGS:       .BYTE 1                     ; Состояние кнопок
 HYSTERESIS:     .BYTE 1                     ; Отклонение температуры от уставки
-TEMP_L:		.BYTE 1
-TEMP_H:		.BYTE 1
+TEMP_L:		.BYTE 1			    ; Младший байт температуры
+TEMP_H:		.BYTE 1			    ; Старший байт температуры
+TEMP_F:		.BYTE 1			    ; Дробная часть
 ;//</editor-fold>
 
 
@@ -162,8 +163,7 @@ _indicate_4:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_3_PIN
     sbi       PORTD, DIGIT_4_PIN
-;    lds       TEMP_REG_A, DIGITS
-    ldi	      TEMP_REG_A, 0
+    lds       TEMP_REG_A, TEMP_F
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -207,19 +207,6 @@ MCU_INIT:
    outi      r16, UCSRB, (1<<RXEN) | (1<<TXEN)	    ; Включение приема и передачии
    outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)    ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
    
-;   ldi r19, 0b11111011
-;   cbr	r19, (1<<0) | (1<<1) | (1<<2)
-;   cpi	r19, 0xf8
-;   breq to_unsigned
-;   rjmp continue
-;   
-;to_unsigned:
-;    ldi	r16, 0xfc ; high
-;    ldi	r17, 0x90 ; low
-;    com	r16
-;    com	r17
-;    ldi	    r18, 1
-;    add	    r17, r18
    
 continue:
     clr       r1
@@ -231,6 +218,8 @@ continue:
     clr	    r16
     sts	    TEMP_L, r16
     sts	    TEMP_H, r16
+    ldi r16, 0xf0
+    sts	    TEMP_F, r16
         
 
     display_load 0			    ; загружаем число, которое нужно показать на индикатор
@@ -297,6 +286,7 @@ TEMP_RD:
     push	r17
     push	r18
     push	r19
+    push	r20
 ;    cli
     
     rcall	OW_PRESENCE
@@ -336,7 +326,7 @@ _TEMP_RD_TO_UNSIGNED:
     ldi	    r19, 0
     adc	    r18, r19
     rjmp    PC+2
-
+    
 _TEMP_RD_CONTINUE:			    ; Температура = Число с АЦП / 16 (сдвиг вправо 4)
     pop		r18
     lsr r18
@@ -347,11 +337,36 @@ _TEMP_RD_CONTINUE:			    ; Температура = Число с АЦП / 16 (�
     ror r17
     lsr r18
     ror r17
-_TEMP_RD_END:
+_TEMP_RD_END: 
+    lds	    r19, TEMP_L
+    brtc    PC+2
+    neg	    r19				    ; переводим обратно в знаковое число если минус
+    
+    ; далее происходит такое для получения дробной части: 
+    ; ((n<<3) + (n<<1))>>4 или (n*10)/16
+    mov	    r20, r19
+    andi    r19, 0x0f
+    mov	    r20, r19
+    lsl	    r19
+    lsl	    r19
+    lsl	    r19
+    
+    lsl	    r20
+    
+    add	    r19, r20
+    
+    lsr	    r19
+    lsr	    r19
+    lsr	    r19
+    lsr	    r19
+    
+    ; записываем данные
     sts		TEMP_L, r17
     sts		TEMP_H, r18
-
+    sts		TEMP_F, r19
+    
 ;    sei
+    pop		r20
     pop		r19
     pop		r18
     pop		r17
