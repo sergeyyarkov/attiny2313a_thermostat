@@ -39,13 +39,50 @@ TEMP_H:		.BYTE 1
 //<editor-fold defaultstate="collapsed" desc="Вектора">
 .ORG 0x00     
     rjmp 	RESET_vect
+    
+.ORG 0x000B
+;    rjmp  PCINT0_vect
+    reti
 
 .ORG 0x000D   
     rjmp	TIMER0_COMPA_vect
 //</editor-fold>
+    
+//<editor-fold defaultstate="collapsed" desc="Прерывание: изменение состояния пина">
+PCINT0_vect:
+    push    r16
+    push    r17
+    push    r18
+    push    r19
+    in	    r16, SREG
+    
+;    in	    r17, SW_PIN
+;    clr	    r18
+;    ldi	    r18, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN)
+;    and	    r17, r18
+;    cp	    r17, r18
+;    breq    _PCINT0_vect_end
+    sbic    SW_PIN, SW_SET_PIN
+    rjmp    _PCINT0_vect_end
+    
+    lds	    r18, MCU_STATE
+    cpi	    r18, MCU_STATE_DEFAULT
+    breq    _INTO_PROGRAM_STATE
+    rjmp    _PCINT0_vect_end
+    
+_INTO_PROGRAM_STATE:
+    ldi	    r17, MCU_STATE_PROGRAM
+    sts	    MCU_STATE, r17
+    
+_PCINT0_vect_end:
+    out	    SREG, r16
+    pop	    r19
+    pop	    r18
+    pop	    r17
+    pop	    r16
+    reti//</editor-fold>
 
-
-//<editor-fold defaultstate="collapsed" desc="Прерывание: Динамическая индикация">
+//<editor-fold defaultstate="collapsed" desc="Прерывание: динамическая индикация">
 ; **** ДИНАМИЧЕСКАЯ ИНДИКАЦИЯ ************************************
 TIMER0_COMPA_vect:
     push      r20
@@ -69,8 +106,18 @@ _indicate_1:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_3_PIN
     cbi       PORTD, DIGIT_4_PIN
+;    lds       TEMP_REG_A, DIGITS+2
+    brts      PC+2
+    rjmp      PC+3
+    ldi	      TEMP_REG_A, 11 ; // -
+    rjmp      PC+3
+    lds	      TEMP_REG_A, DIGITS+2
+    tst	      TEMP_REG_A
+    breq      PC+3
     sbi       PORTD, DIGIT_1_PIN
-    lds       TEMP_REG_A, DIGITS+3
+    rjmp      PC+2
+    cbi       PORTD, DIGIT_1_PIN
+;    lds       TEMP_REG_A, DIGITS+2
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -81,8 +128,13 @@ _indicate_2:
     cbi       PORTD, DIGIT_1_PIN
     cbi       PORTD, DIGIT_3_PIN
     cbi       PORTD, DIGIT_4_PIN
+;    lds       TEMP_REG_A, DIGITS+1
+;    tst	      TEMP_REG_A
+;    breq      PC+3
     sbi       PORTD, DIGIT_2_PIN
-    lds       TEMP_REG_A, DIGITS+2
+;    rjmp      PC+2
+;    cbi       PORTD, DIGIT_1_PIN
+    lds       TEMP_REG_A, DIGITS+1
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -94,8 +146,12 @@ _indicate_3:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_4_PIN
     sbi       PORTD, DIGIT_3_PIN
-    lds       TEMP_REG_A, DIGITS+1
+    lds       TEMP_REG_A, DIGITS
     rcall     DISPLAY_DECODER
+    ; зажигаем точку
+    mov	      r16, r0
+    cbr	      r16, (1<<7)
+    mov	      r0, r16
     rcall     USI_TRANSMIT
 
 _indicate_4:
@@ -106,7 +162,8 @@ _indicate_4:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_3_PIN
     sbi       PORTD, DIGIT_4_PIN
-    lds       TEMP_REG_A, DIGITS
+;    lds       TEMP_REG_A, DIGITS
+    ldi	      TEMP_REG_A, 0
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -139,13 +196,32 @@ MCU_INIT:
   outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
   outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
   outi      r16, TIMSK, (1<<OCIE0A)             ; включение прерывания по совпадению
+  
+  ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
+  outi      r16, GIMSK, (1<<PCIE0)
+  outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
 
-  ; **** ИНИЦИАЛИЗАЦИЯ USART *************************************
-  ; outi      r16, UBRRL, LOW(3)                 ; 9600 БОД
-  ; outi      r16, UBRRH, HIGH(3)                ; 9600 БОД
-  ; outi      r16, UCSRB, (1<<RXEN) | (1<<TXEN)   ; Включение приема и передачии
-  ; outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0) ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
-
+  ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
+   outi      r16, UBRRL, LOW(51)			    ; 9600 БОД
+   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
+   outi      r16, UCSRB, (1<<RXEN) | (1<<TXEN)	    ; Включение приема и передачии
+   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)    ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+   
+;   ldi r19, 0b11111011
+;   cbr	r19, (1<<0) | (1<<1) | (1<<2)
+;   cpi	r19, 0xf8
+;   breq to_unsigned
+;   rjmp continue
+;   
+;to_unsigned:
+;    ldi	r16, 0xfc ; high
+;    ldi	r17, 0x90 ; low
+;    com	r16
+;    com	r17
+;    ldi	    r18, 1
+;    add	    r17, r18
+   
+continue:
     clr       r1
     sts       CURRENT_DIGIT,  r1
 
@@ -155,13 +231,9 @@ MCU_INIT:
     clr	    r16
     sts	    TEMP_L, r16
     sts	    TEMP_H, r16
+        
 
     display_load 0			    ; загружаем число, которое нужно показать на индикатор
-            
-    lds		r16, TEMP_L
-    mov		DISP_NUM_L, r16
-    ldi		DISP_NUM_H, 0
-    
     
 ;    sei
 //</editor-fold>
@@ -184,14 +256,13 @@ _STATE_DEFAULT:
     rcall	TEMP_CONV
     rcall	DEBOUNCE_SW
     rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
     rcall	TEMP_RD
+    
     lds		r17, TEMP_L
     mov		DISP_NUM_L, r17
     lds		r17, TEMP_H
     mov		DISP_NUM_H, r17
-
+    
 _STATE_PROGRAM:
     cpi       r16, MCU_STATE_PROGRAM
     brne      _STATE_ERROR
@@ -225,7 +296,8 @@ TEMP_RD:
     push	r16
     push	r17
     push	r18
-    cli
+    push	r19
+;    cli
     
     rcall	OW_PRESENCE
     ldi		r16, DS18B20_CMD_SKIPROM
@@ -247,6 +319,26 @@ TEMP_RD:
     lds		r17, TEMP_L
     lds		r18, TEMP_H
     
+    push	r18
+    cbr		r18, (1<<0) | (1<<1) | (1<<2)	; убираем ненужные биты на время (интересуют последних битов в TEMP_H)
+    cpi		r18, 0xf8			; проверяется является ли число минусовой
+    breq	_TEMP_RD_TO_UNSIGNED		; если да то конвертируем в беззнаковое число
+    clt
+    rjmp	_TEMP_RD_CONTINUE		; если нет то преобразуем значение АЦП в температуру (делим на 16)
+
+_TEMP_RD_TO_UNSIGNED:
+    pop		r18
+    set
+    com	r17
+    com	r18
+    ldi	    r19, 1
+    add	    r17, r19
+    ldi	    r19, 0
+    adc	    r18, r19
+    rjmp    PC+2
+
+_TEMP_RD_CONTINUE:			    ; Температура = Число с АЦП / 16 (сдвиг вправо 4)
+    pop		r18
     lsr r18
     ror r17
     lsr r18
@@ -255,12 +347,12 @@ TEMP_RD:
     ror r17
     lsr r18
     ror r17
-    
+_TEMP_RD_END:
     sts		TEMP_L, r17
     sts		TEMP_H, r18
 
-    
-    sei
+;    sei
+    pop		r19
     pop		r18
     pop		r17
     pop		r16
@@ -268,7 +360,7 @@ TEMP_RD:
 ;    
 TEMP_CONV:
     push	r16
-    cli
+;    cli
     
     rcall	OW_PRESENCE
     ldi		r16, DS18B20_CMD_SKIPROM
@@ -279,7 +371,7 @@ TEMP_CONV:
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
     
-    sei
+;    sei
     pop		r16
     ret
 //</editor-fold>
@@ -320,25 +412,39 @@ _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос кнопок">
 SW_CHECK_PROCESS:
-    rcall       DEBOUNCE_SW
-    sbis        SW_PIN, SW_PLUS_PIN
-    adiw        DISP_NUM_L, 1
+    push    r16
+    rcall   DEBOUNCE_SW
+    sbis    SW_PIN, SW_PLUS_PIN
+    adiw    DISP_NUM_L, 1
 
-    sbis        SW_PIN, SW_MINUS_PIN
-    sbiw        DISP_NUM_L, 1
-    ret//</editor-fold>
+    sbis    SW_PIN, SW_MINUS_PIN
+    sbiw    DISP_NUM_L, 1
+    
+    sbis    SW_PIN, SW_SET_PIN
+    rjmp    _INTO_DEFAULT_STATE
+    rjmp    _SW_CHECK_PROCESS_END
+    
+_INTO_DEFAULT_STATE:
+    ldi	    r16, MCU_STATE_DEFAULT
+    sts	    MCU_STATE, r16
+_SW_CHECK_PROCESS_END:
+    pop	    r16
+    ret
+//</editor-fold>
 
 
 //<editor-fold defaultstate="collapsed" desc="Реализация интерфеса 1-Wire">
 //<editor-fold defaultstate="collapsed" desc="1-Wire: оспрос присутствия">
 ; **** ОПРОС ПРИСУТСТВИЯ УСТРОЙСТВА ******************************
 OW_PRESENCE:
+    cli
     ow_pull
     DELAY16	480
     ow_release
     DELAY16	70
     rcall	OW_CHECK_PRESENCE
     DELAY16	410
+    sei
     ret
 //</editor-fold>
 
@@ -367,16 +473,20 @@ _OW_SEND_BYTE_LOOP:
     brcc    _OW_SEND_0
     brcs    _OW_SEND_1
 _OW_SEND_0:
+    cli
     ow_pull
     DELAY16 60
     ow_release
     DELAY16 10
+    sei
     rjmp    _OW_SEND_BYTE_END
 _OW_SEND_1:
+    cli
     ow_pull
     DELAY16 6
     ow_release
     DELAY16 64
+    sei
 _OW_SEND_BYTE_END:
     dec	    r17
     brne    _OW_SEND_BYTE_LOOP
@@ -391,6 +501,7 @@ OW_RD_BYTE:
     push    r17
     clr	    r16
     ldi	    r17, 8
+    cli
 _OW_RD_BYTE_LP:
     lsr	    r16
     ow_pull
@@ -403,6 +514,7 @@ _OW_RD_BYTE_LP:
     dec	    r17
     brne    _OW_RD_BYTE_LP
     st	    X, r16
+    sei
     pop	    r17
     pop	    r16
     ret

@@ -1021,6 +1021,12 @@
                   value=""/>
         <property key="warningmessagebreakoptions.warningmessages" value="holdstate"/>
       </Tool>
+      <item path="definitions.asm" ex="true" overriding="false">
+      </item>
+      <item path="div16u.asm" ex="true" overriding="false">
+      </item>
+      <item path="macros.asm" ex="true" overriding="false">
+      </item>
     </conf>
   </confs>
 </configurationDescriptor>

@@ -57,17 +57,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=main.asm div16u.asm definitions.asm macros.asm
+SOURCEFILES_QUOTED_IF_SPACED=main.asm
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.obj ${OBJECTDIR}/div16u.obj ${OBJECTDIR}/definitions.obj ${OBJECTDIR}/macros.obj
-POSSIBLE_DEPFILES=${OBJECTDIR}/main.obj.d ${OBJECTDIR}/div16u.obj.d ${OBJECTDIR}/definitions.obj.d ${OBJECTDIR}/macros.obj.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.obj
+POSSIBLE_DEPFILES=${OBJECTDIR}/main.obj.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/main.obj ${OBJECTDIR}/div16u.obj ${OBJECTDIR}/definitions.obj ${OBJECTDIR}/macros.obj
+OBJECTFILES=${OBJECTDIR}/main.obj
 
 # Source Files
-SOURCEFILES=main.asm div16u.asm definitions.asm macros.asm
+SOURCEFILES=main.asm
 
 # Pack Options 
 PACK_ASSEMBLER_OPTIONS=-I "${DFP_DIR}/avrasm/inc"  -i tn2313Adef.inc
@@ -101,42 +101,12 @@ ${OBJECTDIR}/main.obj: main.asm  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/main.obj 
 	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp main.asm
-${OBJECTDIR}/div16u.obj: div16u.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/div16u.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp div16u.asm
-${OBJECTDIR}/definitions.obj: definitions.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/definitions.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp definitions.asm
-${OBJECTDIR}/macros.obj: macros.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/macros.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp macros.asm
 else
 ${OBJECTDIR}/main.obj: main.asm  nbproject/Makefile-${CND_CONF}.mk 
 	@${MKDIR} ${DISTDIR} 
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/main.obj 
 	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.hex  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -l ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.lss main.asm
-${OBJECTDIR}/div16u.obj: div16u.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/div16u.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.hex  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -l ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.lss div16u.asm
-${OBJECTDIR}/definitions.obj: definitions.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/definitions.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.hex  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -l ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.lss definitions.asm
-${OBJECTDIR}/macros.obj: macros.asm  nbproject/Makefile-${CND_CONF}.mk 
-	@${MKDIR} ${DISTDIR} 
-	@${MKDIR} "${OBJECTDIR}" 
-	@${RM} ${OBJECTDIR}/macros.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.hex  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -l ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.lss macros.asm
 endif
 
 # ------------------------------------------------------------------------------------
