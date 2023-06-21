@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  main.asm Tue Jun 20 22:06:23 2023
+AVRASM ver. 2.2.7  main.asm Tue Jun 20 22:15:20 2023
 
 [builtin](2): Including file '/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc\tn2313Adef.inc'
 main.asm(15): Including file 'definitions.asm'
@@ -1059,7 +1059,7 @@ main.asm(275): Including file 'div16u.asm'
 0000a0 d113                          rcall	DEBOUNCE_SW
 0000a1 d112                          rcall	DEBOUNCE_SW
 0000a2 d02e                          rcall	TEMP_RD
-                                     
+                                         
 0000a3 9110 006a                     lds		r17, TEMP_L
 0000a5 2f81                          mov		DISP_NUM_L, r17
 0000a6 9110 006b                     lds		r17, TEMP_H
@@ -1206,7 +1206,7 @@ main.asm(275): Including file 'div16u.asm'
                                  _TEMP_RD_END: 
 0000ff 9130 006a                     lds	    r19, TEMP_L
 000101 f40e                          brtc    PC+2
-000102 9531                          neg	    r19				    ; переводим обратно в знаковое число если минус
+000102 9531                          neg	    r19				    ; переводим в беззнаковое число если минус
                                      
                                      ; далее происходит такое для получения дробной части: 
                                      ; ((n<<3) + (n<<1))>>4 или (n*10)/16

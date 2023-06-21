@@ -246,7 +246,7 @@ _STATE_DEFAULT:
     rcall	DEBOUNCE_SW
     rcall	DEBOUNCE_SW
     rcall	TEMP_RD
-    
+        
     lds		r17, TEMP_L
     mov		DISP_NUM_L, r17
     lds		r17, TEMP_H
