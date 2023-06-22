@@ -187,8 +187,8 @@ RESET_vect:
 ; **** ПРОЦЕСС ИНИЦИАЛИЗАЦИИ МК **********************************
 MCU_INIT:
   ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
-  outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (0<<UART_RX_PIN) | (1<<UART_TX_PIN)
-  outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN)
+  outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN)
+  outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
   outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
   
   ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 **********************************
@@ -202,26 +202,27 @@ MCU_INIT:
   outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
 
   ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
-   outi      r16, UBRRL, LOW(51)			    ; 9600 БОД
-   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
-   outi      r16, UCSRB, (1<<RXEN) | (1<<TXEN)	    ; Включение приема и передачии
-   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)    ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+;   outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
+;   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
+;   outi      r16, UCSRB, (1<<RXEN)		    ; Включение передачии
+;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
    
    
 continue:
-    clr       r1
-    sts       CURRENT_DIGIT,  r1
+    clr     r1
+    sts     CURRENT_DIGIT,  r1
 
-    ldi       r16, 0x00
-    sts       MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
+    ldi     r16, 0x00
+    sts     MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
     
     clr	    r16
     sts	    TEMP_L, r16
     sts	    TEMP_H, r16
-    ldi r16, 0xf0
+    ldi	    r16, 0xf0
     sts	    TEMP_F, r16
-        
-
+    
+    rcall   BEEP_SHORT
+    
     display_load 0			    ; загружаем число, которое нужно показать на индикатор
     
 ;    sei
@@ -273,13 +274,7 @@ _STATE_ERROR:
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
-    
-DELAY_LOOP_16:
-    subi DELAY_8_r, 1
-    sbci DELAY_16_r, 0
-    brcc DELAY_LOOP_16
-    ret
-    
+        
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: чтение и опрос температуры">
 TEMP_RD:
     push	r16
@@ -391,7 +386,6 @@ TEMP_CONV:
     ret
 //</editor-fold>
 
-
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: отправка байта в сдвиговый регистр">
 ; **** ОТПРАВКА БАЙТА В СДВИГОВЫЙ РЕГИСТР *************************
 USI_TRANSMIT:
@@ -424,7 +418,6 @@ _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
     pop      r16
     ret//</editor-fold>
 
-
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос кнопок">
 SW_CHECK_PROCESS:
     push    r16
@@ -446,7 +439,6 @@ _SW_CHECK_PROCESS_END:
     pop	    r16
     ret
 //</editor-fold>
-
 
 //<editor-fold defaultstate="collapsed" desc="Реализация интерфеса 1-Wire">
 //<editor-fold defaultstate="collapsed" desc="1-Wire: оспрос присутствия">
@@ -538,7 +530,6 @@ _OW_RD_BYTE_LP:
 
 //</editor-fold>
 
-
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновление ячеек в SRAM для индикатора">
 ; **** ПОЛУЧЕНИЕ ЦИФР ИЗ 16-ТИ БИТНОГО ЧИСЛА *********************
 ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
@@ -582,7 +573,6 @@ DIV_LOOP:
     ret
 //</editor-fold>
 
-
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
 ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
 DISPLAY_DECODER:
@@ -600,6 +590,23 @@ DISPLAY_DECODER:
     pop      r16
     ret//</editor-fold>
 
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: короткий писк">
+BEEP_SHORT:
+    sbi	    BUZZER_PORT, BUZZER_PIN
+    rcall   DELAY
+    cbi	    BUZZER_PORT, BUZZER_PIN
+    ret
+//</editor-fold>
+
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: длинный писк">
+BEEP_LONG:
+    sbi	    BUZZER_PORT, BUZZER_PIN
+    rcall   DELAY
+    rcall   DELAY
+    rcall   DELAY
+    rcall   DELAY
+    cbi	    BUZZER_PORT, BUZZER_PIN
+    ret//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: устранение дребезга кнопки">
 DEBOUNCE_SW:
@@ -627,29 +634,37 @@ _loop_3:
     pop	    r16
     ret//</editor-fold>
 
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка (16бит макс число)">
+DELAY_LOOP_16:
+    subi DELAY_8_r, 1
+    sbci DELAY_16_r, 0
+    brcc DELAY_LOOP_16
+    ret//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка">
 DELAY:
     push    r16
     push    r17
+    push    r18
 
+    ldi	    r18, 6
+_DELAY_0:
     ldi     r16, 255
 _DELAY_1:
     ldi     r17, 255   
 _DELAY_2:
     dec     r17         
-    nop                 
-    nop                
-    nop                 
     brne    _DELAY_2    
 
     dec     r16
     brne    _DELAY_1    
+    dec	    r18
+    brne    _DELAY_0
 
+    pop	    r18
     pop     r17
     pop     r16
     ret  //</editor-fold>
-                  
 
 //<editor-fold defaultstate="collapsed" desc="Символы для индикатора">
 DISPLAY_SYMBOLS:

@@ -45,7 +45,12 @@
 .EQU SW_MINUS_PIN               = PB3		; Кнопка "Плюс"
 .EQU SW_SET_PIN                 = PB4		; Кнопка "Установить"
     
-.EQU UART_RX_PIN		= PD0
+.EQU BUZZER_PIN			= PB5		; Пищалка
+.EQU BUZZER_PORT		= PORTB
+ 
+.EQU RELAY_PIN			= PD0		; Реле
+.EQU RELAY_PORT			= PORTD
+    
 .EQU UART_TX_PIN		= PD1
     
 
