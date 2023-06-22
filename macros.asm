@@ -17,6 +17,26 @@
     cbi       OW_DDR, OW_LINE
 .ENDMACRO
     
+.MACRO relay_on
+    sbi	    RELAY_PORT, RELAY_PIN
+.ENDMACRO
+    
+.MACRO relay_off
+    cbi	    RELAY_PORT, RELAY_PIN
+.ENDMACRO
+    
+.MACRO display_on
+    push    r16
+    outi      r16, TIMSK, (1<<OCIE0A)
+    pop	    r16
+.ENDMACRO
+    
+.MACRO display_off
+    push    r16
+    outi      r16, TIMSK, (0<<OCIE0A)
+    pop	    r16
+.ENDMACRO
+    
 .MACRO DELAY16
     ldi    DELAY_16_r, HIGH(@0*F_CPU/4-2)
     ldi    DELAY_8_r, LOW(@0*F_CPU/4-2)

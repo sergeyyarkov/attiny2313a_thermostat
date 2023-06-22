@@ -51,11 +51,14 @@ TEMP_F:		.BYTE 1			    ; Дробная часть
     
 //<editor-fold defaultstate="collapsed" desc="Прерывание: изменение состояния пина">
 PCINT0_vect:
+    reti
     push    r16
     push    r17
     push    r18
     push    r19
     in	    r16, SREG
+    
+;    display_off
     
 ;    in	    r17, SW_PIN
 ;    clr	    r18
@@ -188,7 +191,7 @@ RESET_vect:
 ; **** ПРОЦЕСС ИНИЦИАЛИЗАЦИИ МК **********************************
 MCU_INIT:
   ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
-  outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN)
+  outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
   outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
   outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
   
@@ -196,7 +199,6 @@ MCU_INIT:
   outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
   outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
   outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
-  outi      r16, TIMSK, (1<<OCIE0A)             ; включение прерывания по совпадению
   
   ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
   outi      r16, GIMSK, (1<<PCIE0)
@@ -236,11 +238,8 @@ LOOP:
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
+    cbi		LED_ERR_PORT, LED_ERR_PIN
     rcall	DISPLAY_UPD_DIGITS
-    sbrc	OWFR, OWPRF
-    sbi		PORTD, PD6
-    sbrs	OWFR, OWPRF
-    cbi		PORTD, PD6
     
     rcall	TEMP_CONV
     rcall	DEBOUNCE_SW
@@ -252,20 +251,23 @@ _STATE_DEFAULT:
     lds		r17, TEMP_H
     mov		DISP_NUM_H, r17
     
+    display_on
+    
 _STATE_PROGRAM:
-    cpi       r16, MCU_STATE_PROGRAM
-    brne      _STATE_ERROR
-    rcall     DISPLAY_UPD_DIGITS
-    rcall     SW_CHECK_PROCESS
+    cpi		r16, MCU_STATE_PROGRAM
+    brne	_STATE_ERROR
+    cbi		LED_ERR_PORT, LED_ERR_PIN
+    rcall	DISPLAY_UPD_DIGITS
+    rcall	SW_CHECK_PROCESS
 _STATE_ERROR:
-    cpi       r16, MCU_STATE_ERROR
-    brne      LOOP
+    cpi		r16, MCU_STATE_ERROR
+    brne	LOOP
+    sbi		LED_ERR_PORT, LED_ERR_PIN
     ldi r17, 11
     sts DIGITS, r17
     sts DIGITS+1, r17
     sts DIGITS+2, r17
     sts DIGITS+3, r17
-    nop
 
     rjmp      LOOP
 //</editor-fold>

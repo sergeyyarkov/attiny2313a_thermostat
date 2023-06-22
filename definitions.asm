@@ -13,7 +13,8 @@
 .EQU DIGIT_4_PIN                = PD5		; Пин разряда индикатора 4
 
 .EQU LED_ERR_PIN		= PD6		; Светодиод который говорит о том, что МК в состоянии ошибки 
-
+.EQU LED_ERR_PORT		= PORTD
+    
 .EQU OW_LINE			= PB1		; Пин шины 1-Wire
 .EQU OW_DDR			= DDRB
 .EQU OW_PIN			= PINB
