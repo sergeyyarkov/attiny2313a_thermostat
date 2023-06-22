@@ -20,5 +20,5 @@
 .MACRO DELAY16
     ldi    DELAY_16_r, HIGH(@0*F_CPU/4-2)
     ldi    DELAY_8_r, LOW(@0*F_CPU/4-2)
-    rcall DELAY_LOOP_16
+    rcall  DELAY_LOOP_16
 .ENDMACRO

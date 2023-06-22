@@ -89,6 +89,7 @@ TIMER0_COMPA_vect:
     push      r20
     push      r21
     push      r16
+    push      r17
     in r21, SREG
 
     lds       r20,  CURRENT_DIGIT
@@ -107,7 +108,6 @@ _indicate_1:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_3_PIN
     cbi       PORTD, DIGIT_4_PIN
-;    lds       TEMP_REG_A, DIGITS+2
     brts      PC+2
     rjmp      PC+3
     ldi	      TEMP_REG_A, 11 ; // -
@@ -118,7 +118,6 @@ _indicate_1:
     sbi       PORTD, DIGIT_1_PIN
     rjmp      PC+2
     cbi       PORTD, DIGIT_1_PIN
-;    lds       TEMP_REG_A, DIGITS+2
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -129,12 +128,13 @@ _indicate_2:
     cbi       PORTD, DIGIT_1_PIN
     cbi       PORTD, DIGIT_3_PIN
     cbi       PORTD, DIGIT_4_PIN
-;    lds       TEMP_REG_A, DIGITS+1
-;    tst	      TEMP_REG_A
-;    breq      PC+3
-    sbi       PORTD, DIGIT_2_PIN
-;    rjmp      PC+2
-;    cbi       PORTD, DIGIT_1_PIN
+    lds       TEMP_REG_A, DIGITS+1
+    lds	      r19, DIGITS+2
+    or	      TEMP_REG_A, r19
+    breq      PC+3
+    sbi	      PORTD, DIGIT_2_PIN
+    rjmp      PC+2
+    cbi       PORTD, DIGIT_2_PIN
     lds       TEMP_REG_A, DIGITS+1
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
@@ -172,6 +172,7 @@ _indicate_exit:
     sts       CURRENT_DIGIT, r20
     out SREG, r21
     
+    pop	r17
     pop r16
     pop r21
     pop r20
@@ -207,8 +208,6 @@ MCU_INIT:
 ;   outi      r16, UCSRB, (1<<RXEN)		    ; Включение передачии
 ;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
    
-   
-continue:
     clr     r1
     sts     CURRENT_DIGIT,  r1
 
