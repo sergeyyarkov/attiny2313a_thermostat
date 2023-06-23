@@ -30,6 +30,7 @@ HYSTERESIS:     .BYTE 1                     ; Отклонение темпер�
 TEMP_L:		.BYTE 1			    ; Младший байт температуры
 TEMP_H:		.BYTE 1			    ; Старший байт температуры
 TEMP_F:		.BYTE 1			    ; Дробная часть
+;SETTING_INT:	.BYTE 1			    ; Уставка: целая часть
 ;//</editor-fold>
 
 
@@ -51,7 +52,6 @@ TEMP_F:		.BYTE 1			    ; Дробная часть
     
 //<editor-fold defaultstate="collapsed" desc="Прерывание: изменение состояния пина">
 PCINT0_vect:
-    reti
     push    r16
     push    r17
     push    r18
@@ -203,13 +203,13 @@ MCU_INIT:
   ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
   outi      r16, GIMSK, (1<<PCIE0)
   outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
-
+  
   ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
 ;   outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
 ;   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
-;   outi      r16, UCSRB, (1<<RXEN)		    ; Включение передачии
+;   outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
 ;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
-   
+    
     clr     r1
     sts     CURRENT_DIGIT,  r1
 
@@ -223,7 +223,7 @@ MCU_INIT:
     sts	    TEMP_F, r16
     
     rcall   BEEP_SHORT
-    
+     
     display_load 0			    ; загружаем число, которое нужно показать на индикатор
     
 ;    sei
@@ -234,25 +234,14 @@ MCU_INIT:
 LOOP:
   ; rcall       DISPLAY_UPD_DIGITS
     lds         r16, MCU_STATE           ; получаем текущее состояние МК
-
+    
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
     cbi		LED_ERR_PORT, LED_ERR_PIN
     rcall	DISPLAY_UPD_DIGITS
-    
-    rcall	TEMP_CONV
-    rcall	DEBOUNCE_SW
-    rcall	DEBOUNCE_SW
-    rcall	TEMP_RD
-        
-    lds		r17, TEMP_L
-    mov		DISP_NUM_L, r17
-    lds		r17, TEMP_H
-    mov		DISP_NUM_H, r17
-    
-    display_on
-    
+    rcall	TEMP_UPD
+    outi      r16, TIMSK, (1<<OCIE0A)	  ; вкл. индикатор
 _STATE_PROGRAM:
     cpi		r16, MCU_STATE_PROGRAM
     brne	_STATE_ERROR
@@ -268,15 +257,31 @@ _STATE_ERROR:
     sts DIGITS+1, r17
     sts DIGITS+2, r17
     sts DIGITS+3, r17
-
+    
     rjmp      LOOP
 //</editor-fold>
 
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
-        
-//<editor-fold defaultstate="collapsed" desc="Подпрограмма: чтение и опрос температуры">
+    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
+TEMP_UPD:
+    push    r17
+    rcall   TEMP_CONV
+    DELAY24 760000
+    rcall   TEMP_RD
+    
+    ; обновляем данные в ячейках
+    lds	    r17, TEMP_L
+    mov	    DISP_NUM_L, r17
+    lds	    r17, TEMP_H
+    mov	    DISP_NUM_H, r17
+    pop	    r17
+    ret
+//</editor-fold>
+
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос температуры и чтение">
 TEMP_RD:
     push	r16
     push	r17
@@ -640,7 +645,15 @@ DELAY_LOOP_16:
     subi DELAY_8_r, 1
     sbci DELAY_16_r, 0
     brcc DELAY_LOOP_16
-    ret//</editor-fold>
+    ret
+//</editor-fold>
+    
+DELAY_LOOP_24:
+    subi DELAY_8_r, 1
+    sbci DELAY_16_r, 0
+    sbci DELAY_24_r, 0
+    brcc DELAY_LOOP_24
+    ret
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка">
 DELAY:

@@ -4,6 +4,7 @@
 .DEF TEMP_REG_B                 = r17
 .DEF DELAY_16_r			= r19
 .DEF DELAY_8_r			= r20
+.DEF DELAY_24_r			= r21
 .DEF DISP_NUM_L                 = r24		; LSB числа которое сейчас на индикаторе
 .DEF DISP_NUM_H                 = r25		; MSB числа которое сейчас на индикаторе
 
