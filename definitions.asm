@@ -59,3 +59,16 @@
 .EQU MCU_STATE_DEFAULT          = 0x00		; Режим измерения температуры и сравнения с заданными параметрами
 .EQU MCU_STATE_PROGRAM          = 0x01		; Режим настройки параметров в EEPROM
 .EQU MCU_STATE_ERROR            = 0x02		; Режим ошибки, например когда не подключен датчик
+    
+; **** СТАНДАРТНЫЕ ПАРАМЕТРЫ ***********************************
+
+; Отдельно задается целая и дробная часть в точности до десятых
+; Например: 30.5 градусов
+.EQU DEFAULT_SETTING_INT	= 29	
+.EQU DEFAULT_SETTING_F		= 5	// 0.5
+    
+.EQU DEFAULT_SETTING_HYST	= 5	// 0.5
+    
+.EQU HEAT_MODE			= 1
+.EQU COOLING_MODE		= 0
+.EQU DEFAULT_SETTING_MODE	= HEAT_MODE

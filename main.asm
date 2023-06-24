@@ -26,11 +26,14 @@ SRAM_TEMP_1:    .BYTE 2                     ; Хранения временно�
 DIGITS:         .BYTE 4                     ; Ячейки, где хранятся символы, для вывода на индикатор
 CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
 SW_FLAGS:       .BYTE 1                     ; Состояние кнопок
-HYSTERESIS:     .BYTE 1                     ; Отклонение температуры от уставки
 TEMP_L:		.BYTE 1			    ; Младший байт температуры
 TEMP_H:		.BYTE 1			    ; Старший байт температуры
 TEMP_F:		.BYTE 1			    ; Дробная часть
-;SETTING_INT:	.BYTE 1			    ; Уставка: целая часть
+SETTING_INT:	.BYTE 1			    ; Уставка: целая часть
+SETTING_F:	.BYTE 1			    ; Уставка: дробная часть
+SETTING_HYST:	.BYTE 1			    ; Гистерезис: отклонение от уставки
+SETTING_MODE:	.BYTE 1			    ; Режим работы: '1' - нагрев; '0' - 'охлаждение'
+DEVICE_FAMILY_CODE: .BYTE 1		    ; Должно быть 0x10 для DS18B20
 ;//</editor-fold>
 
 
@@ -190,31 +193,41 @@ RESET_vect:
 //<editor-fold defaultstate="collapsed" desc="Инициализация МК (настрока портов и переферии)">
 ; **** ПРОЦЕСС ИНИЦИАЛИЗАЦИИ МК **********************************
 MCU_INIT:
-  ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
-  outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
-  outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
-  outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
+    ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
+    outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
+    outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
+    outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
+
+    ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 **********************************
+    outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
+    outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
+    outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
+
+    ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
+    outi      r16, GIMSK, (1<<PCIE0)
+    outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
   
-  ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 **********************************
-  outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
-  outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
-  outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
-  
-  ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
-  outi      r16, GIMSK, (1<<PCIE0)
-  outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
-  
-  ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
-;   outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
-;   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
-;   outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
-;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+    ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
+    ;   outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
+    ;   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
+    ;   outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
+    ;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
     
+    ; **** ИНИЦИАЛИЗАЦИЯ ДАННЫХ В ОЗУ ******************************
     clr     r1
     sts     CURRENT_DIGIT,  r1
 
     ldi     r16, 0x00
     sts     MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
+    
+    ldi	    r16, DEFAULT_SETTING_INT
+    sts	    SETTING_INT, r16
+    ldi	    r16, DEFAULT_SETTING_F
+    sts	    SETTING_F, r16
+    ldi	    r16, DEFAULT_SETTING_HYST
+    sts	    SETTING_HYST, r16
+    ldi	    r16, DEFAULT_SETTING_MODE
+    sts	    SETTING_MODE, r16
     
     clr	    r16
     sts	    TEMP_L, r16
@@ -222,9 +235,23 @@ MCU_INIT:
     ldi	    r16, 0xf0
     sts	    TEMP_F, r16
     
+    ; **** СТАРТУЕМ ************************************************
+    
+    rcall   RD_F_CODE		; проверяем что датчик есть на шине
+    
+    lds	    r16, DEVICE_FAMILY_CODE
+    cpi	    r16, 0x10
+    brne    ERR_FAMILY_CODE
+    rjmp    START_PROGRAM
+    
+ERR_FAMILY_CODE:
+    ldi	    r17, MCU_STATE_ERROR
+    sts	    MCU_STATE, r17
+    rcall   BEEP_LONG
+    rjmp    PC+2
+START_PROGRAM:
     rcall   BEEP_SHORT
-     
-    display_load 0			    ; загружаем число, которое нужно показать на индикатор
+    display_load 0
     
 ;    sei
 //</editor-fold>
@@ -241,7 +268,8 @@ _STATE_DEFAULT:
     cbi		LED_ERR_PORT, LED_ERR_PIN
     rcall	DISPLAY_UPD_DIGITS
     rcall	TEMP_UPD
-    outi      r16, TIMSK, (1<<OCIE0A)	  ; вкл. индикатор
+    outi	r16, TIMSK, (1<<OCIE0A)	  ; вкл. индикатор
+    rcall	TEMP_COMPARSION
 _STATE_PROGRAM:
     cpi		r16, MCU_STATE_PROGRAM
     brne	_STATE_ERROR
@@ -264,12 +292,85 @@ _STATE_ERROR:
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
+   
+TEMP_COMPARSION:
+;    push    r16
+;    push    r17
+;    push    r18
+;    push    r19
+;    push    r20
+;    push    r21
+;    push    r22
+;    
+;    lds	    r16, TEMP_L
+;    lds	    r17, TEMP_H	// всегда 0?
+;    lds	    r18, TEMP_F
+;    lds	    r19, SETTING_INT
+;    lds	    r20, SETTING_F
+;    lds	    r21, SETTING_MODE
+;    
+;    brtc    _START_COMPARSION
+;    neg	    r19
+;    
+;_START_COMPARSION:
+;    tst	    r21
+;    brne    _HEATING
+;_COOLING:
+;    rjmp    _COMPARSION_EXIT
+;_HEATING:
+;    cp	    r16, r19
+;    brge    _HEATING_GREATER_OR_E	    ; если целая часть текущей температуры <= уставки - продолжаем сравнение
+;    brtc    PC+3
+;    relay_off
+;    rjmp    PC+2
+;    relay_on	; c
+;    rjmp    _COMPARSION_EXIT
+;_HEATING_GREATER_OR_E:
+;    cp	    r16, r19
+;    breq    _HEATING_GREATER_E
+;    brtc    PC+3
+;    relay_on
+;    rjmp    PC+2
+;    relay_off	; c
+;    rjmp    _COMPARSION_EXIT
+;_HEATING_GREATER_E:
+;    brtc    PC+3
+;    relay_off
+;    rjmp    PC+2
+;    relay_on	; c
+;    cp	    r18, r20
+;    brge    PC+2		    ; если дробная часть текущей температуры >= уставки - выключаем реле
+;    rjmp    _COMPARSION_EXIT
+;_HEATING_GREATER_OR_E_F:
+;    cp	    r18, r20
+;    breq    _HEATING_GREATER_E_F
+;    brtc    PC+3
+;    relay_on
+;    rjmp    PC+2
+;    relay_off	; c
+;    rjmp    _COMPARSION_EXIT
+;_HEATING_GREATER_E_F:
+;    brtc    PC+3
+;    relay_on
+;    rjmp    PC+2
+;    relay_off	; c
+;
+;_COMPARSION_EXIT:
+;    pop	    r22
+;    pop	    r21
+;    pop	    r20
+;    pop	    r19
+;    pop	    r18
+;    pop	    r17
+;    pop	    r16
+    ret
     
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
 TEMP_UPD:
     push    r17
     rcall   TEMP_CONV
-    DELAY24 760000
+    DELAY24 500000
+    DELAY24 500000
     rcall   TEMP_RD
     
     ; обновляем данные в ячейках
@@ -280,6 +381,31 @@ TEMP_UPD:
     pop	    r17
     ret
 //</editor-fold>
+
+//<editor-fold defaultstate="collapsed" desc="Подрограмма: чтение кода семейства датчика">
+RD_F_CODE:
+    push	r16
+    
+    rcall	OW_PRESENCE
+    ldi		r16, DS18B20_CMD_SKIPROM
+    mov		OW_CMD_r, r16
+    rcall	OW_SEND_BYTE
+    
+    ldi		r16, DS18B20_CMD_RSCRATCHPAD
+    mov		OW_CMD_r, r16
+    rcall	OW_SEND_BYTE
+    
+    ldi		XL, LOW(DEVICE_FAMILY_CODE)
+    ldi		XH, HIGH(DEVICE_FAMILY_CODE)
+    
+    ldi		r16, 8
+_RD_L: 
+    rcall	OW_RD_BYTE
+    dec		r16
+    brne	_RD_L
+    
+    pop		r16
+    ret//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос температуры и чтение">
 TEMP_RD:
