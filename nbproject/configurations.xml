@@ -16,6 +16,8 @@
       <itemPath>div16u.asm</itemPath>
       <itemPath>definitions.asm</itemPath>
       <itemPath>macros.asm</itemPath>
+      <itemPath>div8u.asm</itemPath>
+      <itemPath>mpy16u.asm</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -1033,11 +1035,15 @@
         <AVR-Global>
         </AVR-Global>
       </item>
+      <item path="div8u.asm" ex="true" overriding="false">
+      </item>
       <item path="macros.asm" ex="true" overriding="false">
         <AVR-ASM>
         </AVR-ASM>
         <AVR-Global>
         </AVR-Global>
+      </item>
+      <item path="mpy16u.asm" ex="true" overriding="false">
       </item>
     </conf>
   </confs>

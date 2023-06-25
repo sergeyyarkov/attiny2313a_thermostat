@@ -63,12 +63,15 @@
 ; **** СТАНДАРТНЫЕ ПАРАМЕТРЫ ***********************************
 
 ; Отдельно задается целая и дробная часть в точности до десятых
-; Например: 30.5 градусов
-.EQU DEFAULT_SETTING_INT	= 0	
-.EQU DEFAULT_SETTING_F		= 5	// 0.5
-    
-.EQU DEFAULT_SETTING_HYST	= 15	// 1.5
+.EQU DEFAULT_TEMP		= 150			    ; 30.5 градусов
+.EQU DEFAULT_HYST		= 8			    ; 1.2 градуса гистерезис
     
 .EQU HEAT_MODE			= 1
 .EQU COOLING_MODE		= 0
-.EQU DEFAULT_SETTING_MODE	= HEAT_MODE
+.EQU DEFAULT_MODE		= HEAT_MODE
+
+    
+.EQU DEFAULT_SETTING_TEMP_L	= LOW(DEFAULT_TEMP)	
+.EQU DEFAULT_SETTING_TEMP_H	= HIGH(DEFAULT_TEMP)
+.EQU DEFAULT_SETTING_HYST	= DEFAULT_HYST
+.EQU DEFAULT_SETTING_MODE	= DEFAULT_MODE

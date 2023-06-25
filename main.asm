@@ -29,11 +29,13 @@ SW_FLAGS:       .BYTE 1                     ; Состояние кнопок
 TEMP_L:		.BYTE 1			    ; Младший байт температуры
 TEMP_H:		.BYTE 1			    ; Старший байт температуры
 TEMP_F:		.BYTE 1			    ; Дробная часть
-SETTING_INT:	.BYTE 1			    ; Уставка: целая часть
-SETTING_F:	.BYTE 1			    ; Уставка: дробная часть
+SETTING_TEMP_H:	.BYTE 1			    ; Уставка температуры (старший байт)
+SETTING_TEMP_L:	.BYTE 1			    ; Уставка температуры (младший байт)
 SETTING_HYST:	.BYTE 1			    ; Гистерезис: отклонение от уставки
 SETTING_MODE:	.BYTE 1			    ; Режим работы: '1' - нагрев; '0' - 'охлаждение'
 DEVICE_FAMILY_CODE: .BYTE 1		    ; Должно быть 0x10 для DS18B20
+SRAM_TEMP_2:	.BYTE 1
+SRAM_TEMP_3:	.BYTE 1
 ;//</editor-fold>
 
 
@@ -220,14 +222,18 @@ MCU_INIT:
     ldi     r16, 0x00
     sts     MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
     
-    ldi	    r16, DEFAULT_SETTING_INT
-    sts	    SETTING_INT, r16
-    ldi	    r16, DEFAULT_SETTING_F
-    sts	    SETTING_F, r16
+    ; настройка параметров
+    ldi	    r16, DEFAULT_SETTING_TEMP_L
+    sts	    SETTING_TEMP_L, r16			; уставка LOW
+    
+    ldi	    r16, DEFAULT_SETTING_TEMP_H
+    sts	    SETTING_TEMP_H, r16			; уставка HIGH
+    
     ldi	    r16, DEFAULT_SETTING_HYST
-    sts	    SETTING_HYST, r16
+    sts	    SETTING_HYST, r16			; гистерезис
+    
     ldi	    r16, DEFAULT_SETTING_MODE
-    sts	    SETTING_MODE, r16
+    sts	    SETTING_MODE, r16			; режим работы
     
     clr	    r16
     sts	    TEMP_L, r16
@@ -286,6 +292,8 @@ _STATE_ERROR:
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
+.INCLUDE "div8u.asm"
+.INCLUDE "mpy16u.asm"
    
 TEMP_COMPARSION:
     push    r16
@@ -295,40 +303,94 @@ TEMP_COMPARSION:
     push    r20
     push    r21
     push    r22
-    
-    lds	    r16, TEMP_L
-    lds	    r17, TEMP_H	// всегда 0?
-    lds	    r18, TEMP_F
+    push    r23
+;    
+;    lds	    dd8u, SETTING_HYST
+;    ldi	    dv8u, 10
+;    rcall   div8u
+;    
+;    ; определение нижнего и верхнего порого срабатывания
 ;    lds	    r19, SETTING_INT
-;    lds	    r20, SETTING_F
+;    mov	    r20, r19
+;    sub	    r19, dres8u			    ; MIN = SET - HYST_INT
+;    add	    r20, dres8u			    ; MAX = SET + HYST_INT
+; 
+    .DEF    temp_r_l = r16
+    .DEF    temp_r_h = r17
     
+    .DEF    min_r_trhd_l = r11
+    .DEF    min_r_trhd_h = r10
     
+    .DEF    max_r_trhd_l = r13
+    .DEF    max_r_trhd_h = r12
+    ; умножаем температуру на 10
+    lds	    mc16uL, TEMP_L		    // r16
+    lds	    mc16uH, TEMP_H		    // r17
+    ldi	    mp16uL, LOW(10)
+    ldi	    mp16uH, HIGH(10)
+    rcall   mpy16u
+    mov	    temp_r_l, m16u0			    ; L
+    mov	    temp_r_h, m16u1			    ; H
+    ; добавляем дробную часть
+    lds	    r18, TEMP_F
+    clr	    r19
+    add	    temp_r_l, r18
+    adc	    temp_r_h, r19
+    sts	    SRAM_TEMP_2, temp_r_h
+    sts	    SRAM_TEMP_3, temp_r_l
     
-    ldi	    r19, 28		    ; min
-    ldi	    r20, 32		    ; max
-    lds	    r21, SETTING_MODE	    ; mode
+    ; определяем нижний и верхний пороги
+    lds	    r20, SETTING_TEMP_L
+    lds	    r21, SETTING_TEMP_H
+    lds	    r22, SETTING_HYST
+    push    r20
+    push    r21
+    clr	    r23
+    sub	    r20, r22
+    sbc	    r21, r23
+    mov	    min_r_trhd_l, r20
+    mov	    min_r_trhd_h, r21
+    pop	    r21
+    pop	    r20
+    clr	    r23
+    add	    r20, r22
+    adc	    r21, r23
+    mov	    max_r_trhd_l, r20
+    mov	    max_r_trhd_h, r21
     
-    brts    PC+2
-    rjmp    PC+2
-    neg	    r16
+    ; определяем знак температуры
+    brts    _NEGATE_TEMP
+    rjmp    _CHECK_MODE
+
+_NEGATE_TEMP:
+    com	    temp_r_l
+    com	    temp_r_h
+    subi    temp_r_l, low(-1)
+    sbci    temp_r_h, high(-1)
     
-    tst	    r21
+_CHECK_MODE:
+    ; определяем режим работы
+    lds	    r20, SETTING_MODE
+    tst	    r20
     brne    _HEATING_MODE
-    rjmp    _COMPARSION_EXIT    
-    
+
 _HEATING_MODE:
-    cp	    r19, r16
-    brge    _HEATING_ON		    ; TEMP <= MIN
-    rjmp    _HEATING_OFF
+    ; проверяем нижний порог
+    cp	    min_r_trhd_l, temp_r_l
+    cpc	    min_r_trhd_h, temp_r_h
+    brge    _HEATING_ON			    ; TEMP <= MIN
+    ; проверяем верхний порог
+    cp	    temp_r_l, max_r_trhd_l
+    cpc	    temp_r_h, max_r_trhd_h
+    brge    _HEATING_OFF		    ; TEMP >= TOP
+    rjmp    _COMPARSION_EXIT
 _HEATING_ON:
     relay_on
     rjmp    _COMPARSION_EXIT
 _HEATING_OFF:
-    cp	    r16, r20
-    brge    PC+2		    ; TEMP >= MAX
-    rjmp    _COMPARSION_EXIT
     relay_off
 _COMPARSION_EXIT:
+    pop	    r23
     pop	    r22
     pop	    r21
     pop	    r20

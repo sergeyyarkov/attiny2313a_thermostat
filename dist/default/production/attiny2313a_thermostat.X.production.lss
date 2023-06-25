@@ -1,26 +1,58 @@
 
-AVRASM ver. 2.2.7  main.asm Sun Jun 25 15:01:25 2023
+AVRASM ver. 2.2.7  main.asm Sun Jun 25 23:20:09 2023
 
 [builtin](2): Including file '/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc\tn2313Adef.inc'
 main.asm(15): Including file 'definitions.asm'
 main.asm(16): Including file 'macros.asm'
-main.asm(288): Including file 'div16u.asm'
+main.asm(294): Including file 'div16u.asm'
 div16u.asm(22): warning: Register r16 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
 div16u.asm(23): warning: Register r17 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
 div16u.asm(24): warning: Register r16 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
 div16u.asm(25): warning: Register r17 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
 div16u.asm(27): warning: Register r19 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
 div16u.asm(28): warning: Register r20 already defined by the .DEF directive
-main.asm(288): 'div16u.asm' included form here
+main.asm(294): 'div16u.asm' included form here
+main.asm(295): Including file 'div8u.asm'
+div8u.asm(18): warning: Register r15 already defined by the .DEF directive
+main.asm(295): 'div8u.asm' included form here
+div8u.asm(19): warning: Register r16 already defined by the .DEF directive
+main.asm(295): 'div8u.asm' included form here
+div8u.asm(20): warning: Register r16 already defined by the .DEF directive
+main.asm(295): 'div8u.asm' included form here
+div8u.asm(21): warning: Register r17 already defined by the .DEF directive
+main.asm(295): 'div8u.asm' included form here
+div8u.asm(22): warning: Register r18 already defined by the .DEF directive
+main.asm(295): 'div8u.asm' included form here
+main.asm(296): Including file 'mpy16u.asm'
+mpy16u.asm(19): warning: Register r16 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(20): warning: Register r17 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(21): warning: Register r18 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(22): warning: Register r19 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(23): warning: Register r18 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(24): warning: Register r19 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(25): warning: Register r20 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+mpy16u.asm(26): warning: Register r21 already defined by the .DEF directive
+main.asm(296): 'mpy16u.asm' included form here
+main.asm(318): warning: Register r16 already defined by the .DEF directive
+main.asm(319): warning: Register r17 already defined by the .DEF directive
 [builtin](2): Including file '/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc\tn2313Adef.inc'
 main.asm(15): Including file 'definitions.asm'
 main.asm(16): Including file 'macros.asm'
-main.asm(288): Including file 'div16u.asm'
+main.asm(294): Including file 'div16u.asm'
+main.asm(295): Including file 'div8u.asm'
+main.asm(296): Including file 'mpy16u.asm'
                                  
                                  ;
                                  
@@ -801,14 +833,17 @@ main.asm(288): Including file 'div16u.asm'
                                  ; **** СТАНДАРТНЫЕ ПАРАМЕТРЫ ***********************************
                                  
                                  ; Отдельно задается целая и дробная часть в точности до десятых
-                                 ; Например: 30.5 градусов
-                                 .EQU DEFAULT_SETTING_INT	= 0	
-                                 .EQU DEFAULT_SETTING_F		= 5	// 0.5
-                                     
-                                 .EQU DEFAULT_SETTING_HYST	= 15	// 1.5
+                                 .EQU DEFAULT_TEMP		= 150			    ; 30.5 градусов
+                                 .EQU DEFAULT_HYST		= 8			    ; 1.2 градуса гистерезис
                                      
                                  .EQU HEAT_MODE			= 1
                                  .EQU COOLING_MODE		= 0
+                                 .EQU DEFAULT_MODE		= HEAT_MODE
+                                 
+                                     
+                                 .EQU DEFAULT_SETTING_TEMP_L	= LOW(DEFAULT_TEMP)	
+                                 .EQU DEFAULT_SETTING_TEMP_H	= HIGH(DEFAULT_TEMP)
+                                 .EQU DEFAULT_SETTING_HYST	= DEFAULT_HYST
                                  .INCLUDE "macros.asm"
                                  
                                      ldi     @0, @2
@@ -863,11 +898,13 @@ main.asm(288): Including file 'div16u.asm'
 000069                           TEMP_L:		.BYTE 1			    ; Младший байт температуры
 00006a                           TEMP_H:		.BYTE 1			    ; Старший байт температуры
 00006b                           TEMP_F:		.BYTE 1			    ; Дробная часть
-00006c                           SETTING_INT:	.BYTE 1			    ; Уставка: целая часть
-00006d                           SETTING_F:	.BYTE 1			    ; Уставка: дробная часть
+00006c                           SETTING_TEMP_H:	.BYTE 1			    ; Уставка температуры (старший байт)
+00006d                           SETTING_TEMP_L:	.BYTE 1			    ; Уставка температуры (младший байт)
 00006e                           SETTING_HYST:	.BYTE 1			    ; Гистерезис: отклонение от уставки
 00006f                           SETTING_MODE:	.BYTE 1			    ; Режим работы: '1' - нагрев; '0' - 'охлаждение'
 000070                           DEVICE_FAMILY_CODE: .BYTE 1		    ; Должно быть 0x10 для DS18B20
+000071                           SRAM_TEMP_2:	.BYTE 1
+000072                           SRAM_TEMP_3:	.BYTE 1
                                  ;//</editor-fold>
                                  
                                  
@@ -958,8 +995,8 @@ main.asm(288): Including file 'div16u.asm'
 00003d 9a92                          sbi       PORTD, DIGIT_1_PIN
 00003e c001                          rjmp      PC+2
 00003f 9892                          cbi       PORTD, DIGIT_1_PIN
-000040 d1b0                          rcall     DISPLAY_DECODER
-000041 d12b                          rcall     USI_TRANSMIT
+000040 d1f0                          rcall     DISPLAY_DECODER
+000041 d16b                          rcall     USI_TRANSMIT
                                  
                                  _indicate_2:
 000042 3041                          cpi       r20, 1
@@ -976,8 +1013,8 @@ main.asm(288): Including file 'div16u.asm'
 00004e c001                          rjmp      PC+2
 00004f 9893                          cbi       PORTD, DIGIT_2_PIN
 000050 9100 0064                     lds       TEMP_REG_A, DIGITS+1
-000052 d19e                          rcall     DISPLAY_DECODER
-000053 d119                          rcall     USI_TRANSMIT
+000052 d1de                          rcall     DISPLAY_DECODER
+000053 d159                          rcall     USI_TRANSMIT
                                  
                                  _indicate_3:
 000054 3042                          cpi       r20, 2
@@ -988,12 +1025,12 @@ main.asm(288): Including file 'div16u.asm'
 000058 9895                          cbi       PORTD, DIGIT_4_PIN
 000059 9a94                          sbi       PORTD, DIGIT_3_PIN
 00005a 9100 0063                     lds       TEMP_REG_A, DIGITS
-00005c d194                          rcall     DISPLAY_DECODER
+00005c d1d4                          rcall     DISPLAY_DECODER
                                      ; зажигаем точку
 00005d 2d00                          mov	      r16, r0
 00005e 770f                          cbr	      r16, (1<<7)
 00005f 2e00                          mov	      r0, r16
-000060 d10c                          rcall     USI_TRANSMIT
+000060 d14c                          rcall     USI_TRANSMIT
                                  
                                  _indicate_4:
 000061 3043                          cpi       r20, 3
@@ -1004,8 +1041,8 @@ main.asm(288): Including file 'div16u.asm'
 000065 9894                          cbi       PORTD, DIGIT_3_PIN
 000066 9a95                          sbi       PORTD, DIGIT_4_PIN
 000067 9100 006b                     lds       TEMP_REG_A, TEMP_F
-000069 d187                          rcall     DISPLAY_DECODER
-00006a d102                          rcall     USI_TRANSMIT
+000069 d1c7                          rcall     DISPLAY_DECODER
+00006a d142                          rcall     USI_TRANSMIT
                                  
                                  _indicate_exit:
 00006b 9543                          inc       r20
@@ -1062,14 +1099,18 @@ main.asm(288): Including file 'div16u.asm'
 000089 e000                          ldi     r16, 0x00
 00008a 9300 0060                     sts     MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
                                      
-00008c e000                          ldi	    r16, DEFAULT_SETTING_INT
-00008d 9300 006c                     sts	    SETTING_INT, r16
-00008f e005                          ldi	    r16, DEFAULT_SETTING_F
-000090 9300 006d                     sts	    SETTING_F, r16
-000092 e00f                          ldi	    r16, DEFAULT_SETTING_HYST
-000093 9300 006e                     sts	    SETTING_HYST, r16
+                                     ; настройка параметров
+00008c e906                          ldi	    r16, DEFAULT_SETTING_TEMP_L
+00008d 9300 006d                     sts	    SETTING_TEMP_L, r16			; уставка LOW
+                                     
+00008f e000                          ldi	    r16, DEFAULT_SETTING_TEMP_H
+000090 9300 006c                     sts	    SETTING_TEMP_H, r16			; уставка HIGH
+                                     
+000092 e008                          ldi	    r16, DEFAULT_SETTING_HYST
+000093 9300 006e                     sts	    SETTING_HYST, r16			; гистерезис
+                                     
 000095 e001                          ldi	    r16, DEFAULT_SETTING_MODE
-000096 9300 006f                     sts	    SETTING_MODE, r16
+000096 9300 006f                     sts	    SETTING_MODE, r16			; режим работы
                                      
 000098 2700                          clr	    r16
 000099 9300 0069                     sts	    TEMP_L, r16
@@ -1079,7 +1120,7 @@ main.asm(288): Including file 'div16u.asm'
                                      
                                      ; **** СТАРТУЕМ ************************************************
                                      
-0000a0 d06e                          rcall   RD_F_CODE		; проверяем что датчик есть на шине
+0000a0 d0ae                          rcall   RD_F_CODE		; проверяем что датчик есть на шине
                                      
 0000a1 9100 0070                     lds	    r16, DEVICE_FAMILY_CODE
 0000a3 3208                          cpi	    r16, 0x28		; код семейства для DS18B20 = 0x28
@@ -1089,10 +1130,10 @@ main.asm(288): Including file 'div16u.asm'
                                  ERR_FAMILY_CODE:
 0000a6 e012                          ldi	    r17, MCU_STATE_ERROR
 0000a7 9310 0060                     sts	    MCU_STATE, r17
-0000a9 d156                          rcall   BEEP_LONG
+0000a9 d196                          rcall   BEEP_LONG
 0000aa c001                          rjmp    PC+2
                                  START_PROGRAM:
-0000ab d150                          rcall   BEEP_SHORT
+0000ab d190                          rcall   BEEP_SHORT
 0000ac e080
 0000ad e090                          display_load 0
                                      
@@ -1109,17 +1150,17 @@ main.asm(288): Including file 'div16u.asm'
 0000b0 3000                          cpi		r16, MCU_STATE_DEFAULT
 0000b1 f431                          brne	_STATE_PROGRAM
 0000b2 9896                          cbi		LED_ERR_PORT, LED_ERR_PIN
-0000b3 d123                          rcall	DISPLAY_UPD_DIGITS
-0000b4 d047                          rcall	TEMP_UPD
+0000b3 d163                          rcall	DISPLAY_UPD_DIGITS
+0000b4 d087                          rcall	TEMP_UPD
 0000b5 e001
 0000b6 bf09                          outi	r16, TIMSK, (1<<OCIE0A)	  ; вкл. индикатор
-0000b7 d01c                          rcall	TEMP_COMPARSION
+0000b7 d039                          rcall	TEMP_COMPARSION
                                  _STATE_PROGRAM:
 0000b8 3001                          cpi		r16, MCU_STATE_PROGRAM
 0000b9 f419                          brne	_STATE_ERROR
 0000ba 9896                          cbi		LED_ERR_PORT, LED_ERR_PIN
-0000bb d11b                          rcall	DISPLAY_UPD_DIGITS
-0000bc d0bc                          rcall	SW_CHECK_PROCESS
+0000bb d15b                          rcall	DISPLAY_UPD_DIGITS
+0000bc d0fc                          rcall	SW_CHECK_PROCESS
                                  _STATE_ERROR:
 0000bd 3002                          cpi		r16, MCU_STATE_ERROR
 0000be f779                          brne	LOOP
@@ -1183,217 +1224,360 @@ main.asm(288): Including file 'div16u.asm'
 0000d1 cff2                          rjmp		d16u_1									; else
                                  d16u_3:	
 0000d2 9408                          sec															; set carry to be shifted into result
-0000d3 cff0                         
+                                 .INCLUDE "div8u.asm"
+0000d3 cff0                      
+                                 ;*
+                                 ;* "div8u" - 8/8 Bit Unsigned Division
+                                 ;*
+                                 ;* This subroutine divides the two register variables "dd8u" (dividend) and 
+                                 ;* "dv8u" (divisor). The result is placed in "dres8u" and the remainder in
+                                 ;* "drem8u".
+                                 ;*  
+                                 ;* Number of words	:14
+                                 ;* Number of cycles	:97
+                                 ;* Low registers used	:1 (drem8u)
+                                 ;* High registers used  :3 (dres8u/dd8u,dv8u,dcnt8u)
+                                 ;*
+                                 ;***************************************************************************
+                                 
+                                 ;***** Subroutine Register Variables
+                                 
+                                 .def	drem8u	=r15		;remainder
+                                 .def	dres8u	=r16		;result
+                                 .def	dd8u	=r16		;dividend
+                                 .def	dv8u	=r17		;divisor
+                                 .def	dcnt8u	=r18		;loop counter
+                                 
+                                 ;***** Code
+                                 
+0000d4 18ff                      div8u:	sub	drem8u,drem8u	;clear remainder and carry
+0000d5 e029                      	ldi	dcnt8u,9	;init loop counter
+0000d6 1f00                      d8u_1:	rol	dd8u		;shift left dividend
+0000d7 952a                      	dec	dcnt8u		;decrement counter
+0000d8 f409                      	brne	d8u_2		;if done
+0000d9 9508                      	ret			;    return
+0000da 1cff                      d8u_2:	rol	drem8u		;shift dividend into remainder
+0000db 1af1                      	sub	drem8u,dv8u	;remainder = remainder - divisor
+0000dc f418                      	brcc	d8u_3		;if result negative
+0000dd 0ef1                      	add	drem8u,dv8u	;    restore remainder
+0000de 9488                      	clc			;    clear carry to be shifted into result
+0000df cff6                      	rjmp	d8u_1		;else
+0000e0 9408                      d8u_3:	sec			;    set carry to be shifted into result
+                                 .INCLUDE "mpy16u.asm"
+0000e1 cff4                      
+                                 ;*
+                                 ;* "mpy16u" - 16x16 Bit Unsigned Multiplication
+                                 ;*
+                                 ;* This subroutine multiplies the two 16-bit register variables 
+                                 ;* mp16uH:mp16uL and mc16uH:mc16uL.
+                                 ;* The result is placed in m16u3:m16u2:m16u1:m16u0.
+                                 ;*  
+                                 ;* Number of words	:14 + return
+                                 ;* Number of cycles	:153 + return
+                                 ;* Low registers used	:None
+                                 ;* High registers used  :7 (mp16uL,mp16uH,mc16uL/m16u0,mc16uH/m16u1,m16u2,
+                                 ;*                          m16u3,mcnt16u)	
+                                 ;*
+                                 ;***************************************************************************
+                                 
+                                 ;***** Subroutine Register Variables
+                                 
+                                 .def	mc16uL	=r16		;multiplicand low byte
+                                 .def	mc16uH	=r17		;multiplicand high byte
+                                 .def	mp16uL	=r18		;multiplier low byte
+                                 .def	mp16uH	=r19		;multiplier high byte
+                                 .def	m16u0	=r18		;result byte 0 (LSB)
+                                 .def	m16u1	=r19		;result byte 1
+                                 .def	m16u2	=r20		;result byte 2
+                                 .def	m16u3	=r21		;result byte 3 (MSB)
+                                 .def	mcnt16u	=r22		;loop counter
+                                 
+                                 ;***** Code
+                                 
+0000e2 2755                      mpy16u:	clr	m16u3		;clear 2 highest bytes of result
+0000e3 2744                      	clr	m16u2
+0000e4 e160                      	ldi	mcnt16u,16	;init loop counter
+0000e5 9536                      	lsr	mp16uH
+0000e6 9527                      	ror	mp16uL
+                                 
+0000e7 f410                      m16u_1:	brcc	noad8		;if bit 0 of multiplier set
+0000e8 0f40                      	add	m16u2,mc16uL	;add multiplicand Low to byte 2 of res
+0000e9 1f51                      	adc	m16u3,mc16uH	;add multiplicand high to byte 3 of res
+0000ea 9557                      noad8:	ror	m16u3		;shift right result byte 3
+0000eb 9547                      	ror	m16u2		;rotate right result byte 2
+0000ec 9537                      	ror	m16u1		;rotate result byte 1 and multiplier High
+0000ed 9527                      	ror	m16u0		;rotate result byte 0 and multiplier Low
+0000ee 956a                      	dec	mcnt16u		;decrement loop counter
+0000ef f7b9                      	brne	m16u_1		;if not done, loop more
+0000f0 9508                         
                                  TEMP_COMPARSION:
-0000d4 930f                          push    r16
-0000d5 931f                          push    r17
-0000d6 932f                          push    r18
-0000d7 933f                          push    r19
-0000d8 934f                          push    r20
-0000d9 935f                          push    r21
-0000da 936f                          push    r22
-                                     
-0000db 9100 0069                     lds	    r16, TEMP_L
-0000dd 9110 006a                     lds	    r17, TEMP_H	// всегда 0?
-0000df 9120 006b                     lds	    r18, TEMP_F
+0000f1 930f                          push    r16
+0000f2 931f                          push    r17
+0000f3 932f                          push    r18
+0000f4 933f                          push    r19
+0000f5 934f                          push    r20
+0000f6 935f                          push    r21
+0000f7 936f                          push    r22
+0000f8 937f                          push    r23
+                                 ;    
+                                 ;    lds	    dd8u, SETTING_HYST
+                                 ;    ldi	    dv8u, 10
+                                 ;    rcall   div8u
+                                 ;    
+                                 ;    ; определение нижнего и верхнего порого срабатывания
                                  ;    lds	    r19, SETTING_INT
-                                 ;    lds	    r20, SETTING_F
+                                 ;    mov	    r20, r19
+                                 ;    sub	    r19, dres8u			    ; MIN = SET - HYST_INT
+                                 ;    add	    r20, dres8u			    ; MAX = SET + HYST_INT
+                                 ; 
+                                     .DEF    temp_r_l = r16
+                                     .DEF    temp_r_h = r17
                                      
+                                     .DEF    min_r_trhd_l = r11
+                                     .DEF    min_r_trhd_h = r10
                                      
+                                     .DEF    max_r_trhd_l = r13
+                                     .DEF    max_r_trhd_h = r12
+                                     ; умножаем температуру на 10
+0000f9 9100 0069                     lds	    mc16uL, TEMP_L		    // r16
+0000fb 9110 006a                     lds	    mc16uH, TEMP_H		    // r17
+0000fd e02a                          ldi	    mp16uL, LOW(10)
+0000fe e030                          ldi	    mp16uH, HIGH(10)
+0000ff dfe2                          rcall   mpy16u
+000100 2f02                          mov	    temp_r_l, m16u0			    ; L
+000101 2f13                          mov	    temp_r_h, m16u1			    ; H
+                                     ; добавляем дробную часть
+000102 9120 006b                     lds	    r18, TEMP_F
+000104 2733                          clr	    r19
+000105 0f02                          add	    temp_r_l, r18
+000106 1f13                          adc	    temp_r_h, r19
+000107 9310 0071                     sts	    SRAM_TEMP_2, temp_r_h
+000109 9300 0072                     sts	    SRAM_TEMP_3, temp_r_l
                                      
-0000e1 e13c                          ldi	    r19, 28		    ; min
-0000e2 e240                          ldi	    r20, 32		    ; max
-0000e3 9150 006f                     lds	    r21, SETTING_MODE	    ; mode
+                                     ; определяем нижний и верхний пороги
+00010b 9140 006d                     lds	    r20, SETTING_TEMP_L
+00010d 9150 006c                     lds	    r21, SETTING_TEMP_H
+00010f 9160 006e                     lds	    r22, SETTING_HYST
+000111 934f                          push    r20
+000112 935f                          push    r21
+000113 2777                          clr	    r23
+000114 1b46                          sub	    r20, r22
+000115 0b57                          sbc	    r21, r23
+000116 2eb4                          mov	    min_r_trhd_l, r20
+000117 2ea5                          mov	    min_r_trhd_h, r21
+000118 915f                          pop	    r21
+000119 914f                          pop	    r20
+00011a 2777                          clr	    r23
+00011b 0f46                          add	    r20, r22
+00011c 1f57                          adc	    r21, r23
+00011d 2ed4                          mov	    max_r_trhd_l, r20
+00011e 2ec5                          mov	    max_r_trhd_h, r21
                                      
-0000e5 f00e                          brts    PC+2
-0000e6 c001                          rjmp    PC+2
-0000e7 9501                          neg	    r16
+                                     ; определяем знак температуры
+00011f f00e                          brts    _NEGATE_TEMP
+000120 c004                          rjmp    _CHECK_MODE
+                                 _NEGATE_TEMP:
+000121 9500                          com	    temp_r_l
+000122 9510                          com	    temp_r_h
+000123 5f0f                          subi    temp_r_l, low(-1)
+000124 4f1f                          sbci    temp_r_h, high(-1)
                                      
-0000e8 2355                          tst	    r21
-0000e9 f409                          brne    _HEATING_MODE
-0000ea c009                          rjmp    _COMPARSION_EXIT    
-                                     
+                                 _CHECK_MODE:
+                                     ; определяем режим работы
+000125 9140 006f                     lds	    r20, SETTING_MODE
+000127 2344                          tst	    r20
+000128 f401                          brne    _HEATING_MODE
+                                 
+                                 ;    
+                                 ;    tst	    r21
+                                 ;    brne    _HEATING_MODE
+                                 ;    rjmp    _COMPARSION_EXIT    
+                                 ;    
                                  _HEATING_MODE:
-0000eb 1730                          cp	    r19, r16
-0000ec f40c                          brge    _HEATING_ON		    ; TEMP <= MIN
-0000ed c002                          rjmp    _HEATING_OFF
+                                     ; проверяем нижний порог
+000129 16b0                          cp	    min_r_trhd_l, temp_r_l
+00012a 06a1                          cpc	    min_r_trhd_h, temp_r_h
+00012b f424                          brge    _HEATING_ON			    ; TEMP <= MIN
+                                     ; проверяем верхний порог
+00012c 150d                          cp	    temp_r_l, max_r_trhd_l
+00012d 051c                          cpc	    temp_r_h, max_r_trhd_h
+00012e f41c                          brge    _HEATING_OFF		    ; TEMP >= TOP
+00012f c003                          rjmp    _COMPARSION_EXIT
                                  _HEATING_ON:
-0000ee 9a90                          relay_on
-0000ef c004                          rjmp    _COMPARSION_EXIT
+000130 9a90                          relay_on
+000131 c001                          rjmp    _COMPARSION_EXIT
                                  _HEATING_OFF:
-0000f0 1704                          cp	    r16, r20
-0000f1 f40c                          brge    PC+2		    ; TEMP >= MAX
-0000f2 c001                          rjmp    _COMPARSION_EXIT
-0000f3 9890                          relay_off
+000132 9890                          relay_off
                                  _COMPARSION_EXIT:
-0000f4 916f                          pop	    r22
-0000f5 915f                          pop	    r21
-0000f6 914f                          pop	    r20
-0000f7 913f                          pop	    r19
-0000f8 912f                          pop	    r18
-0000f9 911f                          pop	    r17
-0000fa 910f                          pop	    r16
-0000fb 9508                          ret
+000133 917f                          pop	    r23
+000134 916f                          pop	    r22
+000135 915f                          pop	    r21
+000136 914f                          pop	    r20
+000137 913f                          pop	    r19
+000138 912f                          pop	    r18
+000139 911f                          pop	    r17
+00013a 910f                          pop	    r16
+00013b 9508                          ret
                                      
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
                                  TEMP_UPD:
-0000fc 931f                          push    r17
-0000fd d065                          rcall   TEMP_CONV
-0000fe e05c
-0000ff e334
-000100 ef4d
-000101 d119                          DELAY24 500000
-000102 e05c
-000103 e334
-000104 ef4d
-000105 d115                          DELAY24 500000
-000106 d012                          rcall   TEMP_RD
+00013c 931f                          push    r17
+00013d d065                          rcall   TEMP_CONV
+00013e e05c
+00013f e334
+000140 ef4d
+000141 d119                          DELAY24 500000
+000142 e05c
+000143 e334
+000144 ef4d
+000145 d115                          DELAY24 500000
+000146 d012                          rcall   TEMP_RD
                                      
                                      ; обновляем данные в ячейках
-000107 9110 0069                     lds	    r17, TEMP_L
-000109 2f81                          mov	    DISP_NUM_L, r17
-00010a 9110 006a                     lds	    r17, TEMP_H
-00010c 2f91                          mov	    DISP_NUM_H, r17
-00010d 911f                          pop	    r17
-00010e 9508                          ret
+000147 9110 0069                     lds	    r17, TEMP_L
+000149 2f81                          mov	    DISP_NUM_L, r17
+00014a 9110 006a                     lds	    r17, TEMP_H
+00014c 2f91                          mov	    DISP_NUM_H, r17
+00014d 911f                          pop	    r17
+00014e 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подрограмма: чтение кода семейства датчика">
                                  RD_F_CODE:
-00010f 930f                          push	r16
+00014f 930f                          push	r16
                                      
-000110 d076                          rcall	OW_PRESENCE
-000111 e303                          ldi		r16, DS18B20_CMD_READROM
-000112 2e80                          mov		OW_CMD_r, r16
-000113 d088                          rcall	OW_SEND_BYTE
+000150 d076                          rcall	OW_PRESENCE
+000151 e303                          ldi		r16, DS18B20_CMD_READROM
+000152 2e80                          mov		OW_CMD_r, r16
+000153 d088                          rcall	OW_SEND_BYTE
                                          
-000114 e7a0                          ldi		XL, LOW(DEVICE_FAMILY_CODE)
-000115 e0b0                          ldi		XH, HIGH(DEVICE_FAMILY_CODE)
-000116 d0a6                          rcall	OW_RD_BYTE
+000154 e7a0                          ldi		XL, LOW(DEVICE_FAMILY_CODE)
+000155 e0b0                          ldi		XH, HIGH(DEVICE_FAMILY_CODE)
+000156 d0a6                          rcall	OW_RD_BYTE
                                      
-000117 910f                          pop		r16
-000118 9508                          ret//</editor-fold>
+000157 910f                          pop		r16
+000158 9508                          ret//</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос температуры и чтение">
                                  TEMP_RD:
-000119 930f                          push	r16
-00011a 931f                          push	r17
-00011b 932f                          push	r18
-00011c 933f                          push	r19
-00011d 934f                          push	r20
+000159 930f                          push	r16
+00015a 931f                          push	r17
+00015b 932f                          push	r18
+00015c 933f                          push	r19
+00015d 934f                          push	r20
                                  ;    cli
                                      
-00011e d068                          rcall	OW_PRESENCE
-00011f ec0c                          ldi		r16, DS18B20_CMD_SKIPROM
-000120 2e80                          mov		OW_CMD_r, r16
-000121 d07a                          rcall	OW_SEND_BYTE
+00015e d068                          rcall	OW_PRESENCE
+00015f ec0c                          ldi		r16, DS18B20_CMD_SKIPROM
+000160 2e80                          mov		OW_CMD_r, r16
+000161 d07a                          rcall	OW_SEND_BYTE
                                      
-000122 eb0e                          ldi		r16, DS18B20_CMD_RSCRATCHPAD
-000123 2e80                          mov		OW_CMD_r, r16
-000124 d077                          rcall	OW_SEND_BYTE
+000162 eb0e                          ldi		r16, DS18B20_CMD_RSCRATCHPAD
+000163 2e80                          mov		OW_CMD_r, r16
+000164 d077                          rcall	OW_SEND_BYTE
                                      
-000125 e6a9                          ldi		XL, LOW(TEMP_L)
-000126 e0b0                          ldi		XH, HIGH(TEMP_L)
-000127 d095                          rcall	OW_RD_BYTE
+000165 e6a9                          ldi		XL, LOW(TEMP_L)
+000166 e0b0                          ldi		XH, HIGH(TEMP_L)
+000167 d095                          rcall	OW_RD_BYTE
                                      
-000128 e6aa                          ldi		XL, LOW(TEMP_H)
-000129 e0b0                          ldi		XH, HIGH(TEMP_H)
-00012a d092                          rcall	OW_RD_BYTE
+000168 e6aa                          ldi		XL, LOW(TEMP_H)
+000169 e0b0                          ldi		XH, HIGH(TEMP_H)
+00016a d092                          rcall	OW_RD_BYTE
                                      
-00012b 9110 0069                     lds		r17, TEMP_L
-00012d 9120 006a                     lds		r18, TEMP_H
+00016b 9110 0069                     lds		r17, TEMP_L
+00016d 9120 006a                     lds		r18, TEMP_H
                                      
-00012f 932f                          push	r18
-000130 7f28                          cbr		r18, (1<<0) | (1<<1) | (1<<2)	; убираем ненужные биты на время (интересуют последних битов в TEMP_H)
-000131 3f28                          cpi		r18, 0xf8			; проверяется является ли число минусовой
-000132 f011                          breq	_TEMP_RD_TO_UNSIGNED		; если да то конвертируем в беззнаковое число
-000133 94e8                          clt
-000134 c009                          rjmp	_TEMP_RD_CONTINUE		; если нет то преобразуем значение АЦП в температуру (делим на 16)
+00016f 932f                          push	r18
+000170 7f28                          cbr		r18, (1<<0) | (1<<1) | (1<<2)	; убираем ненужные биты на время (интересуют последних битов в TEMP_H)
+000171 3f28                          cpi		r18, 0xf8			; проверяется является ли число минусовой
+000172 f011                          breq	_TEMP_RD_TO_UNSIGNED		; если да то конвертируем в беззнаковое число
+000173 94e8                          clt
+000174 c009                          rjmp	_TEMP_RD_CONTINUE		; если нет то преобразуем значение АЦП в температуру (делим на 16)
                                  
                                  _TEMP_RD_TO_UNSIGNED:
-000135 912f                          pop		r18
-000136 9468                          set
-000137 9510                          com	r17
-000138 9520                          com	r18
-000139 e031                          ldi	    r19, 1
-00013a 0f13                          add	    r17, r19
-00013b e030                          ldi	    r19, 0
-00013c 1f23                          adc	    r18, r19
-00013d c001                          rjmp    PC+2
+000175 912f                          pop		r18
+000176 9468                          set
+000177 9510                          com	r17
+000178 9520                          com	r18
+000179 e031                          ldi	    r19, 1
+00017a 0f13                          add	    r17, r19
+00017b e030                          ldi	    r19, 0
+00017c 1f23                          adc	    r18, r19
+00017d c001                          rjmp    PC+2
                                      
                                  _TEMP_RD_CONTINUE:			    ; Температура = Число с АЦП / 16 (сдвиг вправо 4)
-00013e 912f                          pop		r18
-00013f 9526                          lsr r18
-000140 9517                          ror r17
-000141 9526                          lsr r18
-000142 9517                          ror r17
-000143 9526                          lsr r18
-000144 9517                          ror r17
-000145 9526                          lsr r18
-000146 9517                          ror r17
+00017e 912f                          pop		r18
+00017f 9526                          lsr r18
+000180 9517                          ror r17
+000181 9526                          lsr r18
+000182 9517                          ror r17
+000183 9526                          lsr r18
+000184 9517                          ror r17
+000185 9526                          lsr r18
+000186 9517                          ror r17
                                  _TEMP_RD_END: 
-000147 9130 0069                     lds	    r19, TEMP_L
-000149 f40e                          brtc    PC+2
-00014a 9531                          neg	    r19				    ; переводим в беззнаковое число если минус
+000187 9130 0069                     lds	    r19, TEMP_L
+000189 f40e                          brtc    PC+2
+00018a 9531                          neg	    r19				    ; переводим в беззнаковое число если минус
                                      
                                      ; далее происходит такое для получения дробной части: 
                                      ; ((n<<3) + (n<<1))>>4 или (n*10)/16
-00014b 2f43                          mov	    r20, r19
-00014c 703f                          andi    r19, 0x0f
-00014d 2f43                          mov	    r20, r19
-00014e 0f33                          lsl	    r19
-00014f 0f33                          lsl	    r19
-000150 0f33                          lsl	    r19
+00018b 2f43                          mov	    r20, r19
+00018c 703f                          andi    r19, 0x0f
+00018d 2f43                          mov	    r20, r19
+00018e 0f33                          lsl	    r19
+00018f 0f33                          lsl	    r19
+000190 0f33                          lsl	    r19
                                      
-000151 0f44                          lsl	    r20
+000191 0f44                          lsl	    r20
                                      
-000152 0f34                          add	    r19, r20
+000192 0f34                          add	    r19, r20
                                      
-000153 9536                          lsr	    r19
-000154 9536                          lsr	    r19
-000155 9536                          lsr	    r19
-000156 9536                          lsr	    r19
+000193 9536                          lsr	    r19
+000194 9536                          lsr	    r19
+000195 9536                          lsr	    r19
+000196 9536                          lsr	    r19
                                      
                                      ; записываем данные
-000157 9310 0069                     sts		TEMP_L, r17
-000159 9320 006a                     sts		TEMP_H, r18
-00015b 9330 006b                     sts		TEMP_F, r19
+000197 9310 0069                     sts		TEMP_L, r17
+000199 9320 006a                     sts		TEMP_H, r18
+00019b 9330 006b                     sts		TEMP_F, r19
                                      
                                  ;    sei
-00015d 914f                          pop		r20
-00015e 913f                          pop		r19
-00015f 912f                          pop		r18
-000160 911f                          pop		r17
-000161 910f                          pop		r16
-000162 9508                          ret
+00019d 914f                          pop		r20
+00019e 913f                          pop		r19
+00019f 912f                          pop		r18
+0001a0 911f                          pop		r17
+0001a1 910f                          pop		r16
+0001a2 9508                          ret
                                  ;    
                                  TEMP_CONV:
-000163 930f                          push	r16
+0001a3 930f                          push	r16
                                  ;    cli
                                      
-000164 d022                          rcall	OW_PRESENCE
-000165 ec0c                          ldi		r16, DS18B20_CMD_SKIPROM
-000166 2e80                          mov		OW_CMD_r, r16
-000167 d034                          rcall	OW_SEND_BYTE
+0001a4 d022                          rcall	OW_PRESENCE
+0001a5 ec0c                          ldi		r16, DS18B20_CMD_SKIPROM
+0001a6 2e80                          mov		OW_CMD_r, r16
+0001a7 d034                          rcall	OW_SEND_BYTE
                                      
-000168 e404                          ldi		r16, DS18B20_CMD_CONVERTTEMP
-000169 2e80                          mov		OW_CMD_r, r16
-00016a d031                          rcall	OW_SEND_BYTE
+0001a8 e404                          ldi		r16, DS18B20_CMD_CONVERTTEMP
+0001a9 2e80                          mov		OW_CMD_r, r16
+0001aa d031                          rcall	OW_SEND_BYTE
                                      
                                  ;    sei
-00016b 910f                          pop		r16
-00016c 9508                          ret
+0001ab 910f                          pop		r16
+0001ac 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: отправка байта в сдвиговый регистр">
                                  ; **** ОТПРАВКА БАЙТА В СДВИГОВЫЙ РЕГИСТР *************************
                                  USI_TRANSMIT:
-00016d 930f                          push      r16
-00016e b80f                          out       USIDR, r0            ; Байт для отправки всегда находится в регистре r0. Помещаем данные в регистр USIDR.
+0001ad 930f                          push      r16
+0001ae b80f                          out       USIDR, r0            ; Байт для отправки всегда находится в регистре r0. Помещаем данные в регистр USIDR.
                                  
                                    ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
-00016f e400                          ldi       TEMP_REG_A, (1<<USIOIF)      
-000170 b90e                          out       USISR, TEMP_REG_A
+0001af e400                          ldi       TEMP_REG_A, (1<<USIOIF)      
+0001b0 b90e                          out       USISR, TEMP_REG_A
                                    
                                    ; Load settings of USI into temp register
                                    ; This will setup USI to Three-wire mode, Software clock strobe (USITC) 
@@ -1403,61 +1587,61 @@ main.asm(288): Including file 'div16u.asm'
                                    ; USICS1 <--------------> USI Clock Source Select
                                    ; USICLK <--------------> USI Clock Strobe
                                    ; USITC  <--------------> USI Toggle Clock (Enable clock generation)      
-000171 e10b                          ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
+0001b1 e10b                          ldi       TEMP_REG_A, (1<<USIWM0) | (1<<USICS1) | (1<<USICLK) | (1<<USITC)
                                    
                                  _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
-000172 b90d                          out       USICR, TEMP_REG_A   ; Load settings from temp register into USI Control Register
-000173 9b76                          sbis      USISR, USIOIF       ; If transfer is comleted then move out of loop
-000174 cffd                          rjmp      _USI_TRANSMIT_LOOP
+0001b2 b90d                          out       USICR, TEMP_REG_A   ; Load settings from temp register into USI Control Register
+0001b3 9b76                          sbis      USISR, USIOIF       ; If transfer is comleted then move out of loop
+0001b4 cffd                          rjmp      _USI_TRANSMIT_LOOP
                                  
                                    ; Send pulse into LATCH pin. 
                                    ; This will copy byte from 74hc595 shift register into 74hc595 storage register
-000175 9ac0                          sbi      PORTB, USI_LATCH_PIN
-000176 98c0                          cbi      PORTB, USI_LATCH_PIN
-000177 910f                          pop      r16
-000178 9508                          ret//</editor-fold>
+0001b5 9ac0                          sbi      PORTB, USI_LATCH_PIN
+0001b6 98c0                          cbi      PORTB, USI_LATCH_PIN
+0001b7 910f                          pop      r16
+0001b8 9508                          ret//</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос кнопок">
                                  SW_CHECK_PROCESS:
-000179 930f                          push    r16
-00017a d08c                          rcall   DEBOUNCE_SW
-00017b 9bb2                          sbis    SW_PIN, SW_PLUS_PIN
-00017c 9601                          adiw    DISP_NUM_L, 1
+0001b9 930f                          push    r16
+0001ba d08c                          rcall   DEBOUNCE_SW
+0001bb 9bb2                          sbis    SW_PIN, SW_PLUS_PIN
+0001bc 9601                          adiw    DISP_NUM_L, 1
                                  
-00017d 9bb3                          sbis    SW_PIN, SW_MINUS_PIN
-00017e 9701                          sbiw    DISP_NUM_L, 1
+0001bd 9bb3                          sbis    SW_PIN, SW_MINUS_PIN
+0001be 9701                          sbiw    DISP_NUM_L, 1
                                      
-00017f 9bb4                          sbis    SW_PIN, SW_SET_PIN
-000180 c001                          rjmp    _INTO_DEFAULT_STATE
-000181 c003                          rjmp    _SW_CHECK_PROCESS_END
+0001bf 9bb4                          sbis    SW_PIN, SW_SET_PIN
+0001c0 c001                          rjmp    _INTO_DEFAULT_STATE
+0001c1 c003                          rjmp    _SW_CHECK_PROCESS_END
                                      
                                  _INTO_DEFAULT_STATE:
-000182 e000                          ldi	    r16, MCU_STATE_DEFAULT
-000183 9300 0060                     sts	    MCU_STATE, r16
+0001c2 e000                          ldi	    r16, MCU_STATE_DEFAULT
+0001c3 9300 0060                     sts	    MCU_STATE, r16
                                  _SW_CHECK_PROCESS_END:
-000185 910f                          pop	    r16
-000186 9508                          ret
+0001c5 910f                          pop	    r16
+0001c6 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Реализация интерфеса 1-Wire">
                                  //<editor-fold defaultstate="collapsed" desc="1-Wire: оспрос присутствия">
                                  ; **** ОПРОС ПРИСУТСТВИЯ УСТРОЙСТВА ******************************
                                  OW_PRESENCE:
-000187 94f8                          cli
-000188 9ab9                          ow_pull
-000189 e033
-00018a eb4e
-00018b d08b                          DELAY16	480
-00018c 98b9                          ow_release
-00018d e030
-00018e e84a
-00018f d087                          DELAY16	70
-000190 d005                          rcall	OW_CHECK_PRESENCE
-000191 e033
-000192 e342
-000193 d083                          DELAY16	410
-000194 9478                          sei
-000195 9508                          ret
+0001c7 94f8                          cli
+0001c8 9ab9                          ow_pull
+0001c9 e033
+0001ca eb4e
+0001cb d08b                          DELAY16	480
+0001cc 98b9                          ow_release
+0001cd e030
+0001ce e84a
+0001cf d087                          DELAY16	70
+0001d0 d005                          rcall	OW_CHECK_PRESENCE
+0001d1 e033
+0001d2 e342
+0001d3 d083                          DELAY16	410
+0001d4 9478                          sei
+0001d5 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="1-Wire: проверка наличия устройства">
@@ -1465,85 +1649,85 @@ main.asm(288): Including file 'div16u.asm'
                                  ; Если подчиненное устройство притянет шину, то устанавливаем флаг OWPRF в единицу в регистре флагов
                                  ;
                                  OW_CHECK_PRESENCE:
-000196 9bb1                          sbis    OW_PIN, OW_LINE
-000197 6071                          sbr	    OWFR, (1<<OWPRF)
-000198 c002                          rjmp    _EXIT
-000199 99b1                          sbic    OW_PIN, OW_LINE
-00019a 7f7e                          cbr	    OWFR, (1<<OWPRF)
+0001d6 9bb1                          sbis    OW_PIN, OW_LINE
+0001d7 6071                          sbr	    OWFR, (1<<OWPRF)
+0001d8 c002                          rjmp    _EXIT
+0001d9 99b1                          sbic    OW_PIN, OW_LINE
+0001da 7f7e                          cbr	    OWFR, (1<<OWPRF)
                                  _EXIT:
-00019b 9508                          ret
+0001db 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="1-Wire: отправка байта">
                                  OW_SEND_BYTE:
-00019c 930f                          push    r16
-00019d 931f                          push    r17    
-00019e 2d08                          mov	    r16, OW_CMD_r
-00019f e018                          ldi	    r17, 8
+0001dc 930f                          push    r16
+0001dd 931f                          push    r17    
+0001de 2d08                          mov	    r16, OW_CMD_r
+0001df e018                          ldi	    r17, 8
                                  _OW_SEND_BYTE_LOOP:
-0001a0 9506                          lsr	    r16
-0001a1 f408                          brcc    _OW_SEND_0
-0001a2 f058                          brcs    _OW_SEND_1
+0001e0 9506                          lsr	    r16
+0001e1 f408                          brcc    _OW_SEND_0
+0001e2 f058                          brcs    _OW_SEND_1
                                  _OW_SEND_0:
-0001a3 94f8                          cli
-0001a4 9ab9                          ow_pull
-0001a5 e030
-0001a6 e746
-0001a7 d06f                          DELAY16 60
-0001a8 98b9                          ow_release
-0001a9 e030
-0001aa e142
-0001ab d06b                          DELAY16 10
-0001ac 9478                          sei
-0001ad c00a                          rjmp    _OW_SEND_BYTE_END
+0001e3 94f8                          cli
+0001e4 9ab9                          ow_pull
+0001e5 e030
+0001e6 e746
+0001e7 d06f                          DELAY16 60
+0001e8 98b9                          ow_release
+0001e9 e030
+0001ea e142
+0001eb d06b                          DELAY16 10
+0001ec 9478                          sei
+0001ed c00a                          rjmp    _OW_SEND_BYTE_END
                                  _OW_SEND_1:
-0001ae 94f8                          cli
-0001af 9ab9                          ow_pull
-0001b0 e030
-0001b1 e04a
-0001b2 d064                          DELAY16 6
-0001b3 98b9                          ow_release
-0001b4 e030
-0001b5 e74e
-0001b6 d060                          DELAY16 64
-0001b7 9478                          sei
+0001ee 94f8                          cli
+0001ef 9ab9                          ow_pull
+0001f0 e030
+0001f1 e04a
+0001f2 d064                          DELAY16 6
+0001f3 98b9                          ow_release
+0001f4 e030
+0001f5 e74e
+0001f6 d060                          DELAY16 64
+0001f7 9478                          sei
                                  _OW_SEND_BYTE_END:
-0001b8 951a                          dec	    r17
-0001b9 f731                          brne    _OW_SEND_BYTE_LOOP
-0001ba 911f                          pop	    r17
-0001bb 910f                          pop	    r16
-0001bc 9508                          ret
+0001f8 951a                          dec	    r17
+0001f9 f731                          brne    _OW_SEND_BYTE_LOOP
+0001fa 911f                          pop	    r17
+0001fb 910f                          pop	    r16
+0001fc 9508                          ret
                                  //</editor-fold>
                                          
                                  //<editor-fold defaultstate="collapsed" desc="1-Wire: чтение байта">
                                  OW_RD_BYTE:
-0001bd 930f                          push    r16
-0001be 931f                          push    r17
-0001bf 2700                          clr	    r16
-0001c0 e018                          ldi	    r17, 8
-0001c1 94f8                          cli
+0001fd 930f                          push    r16
+0001fe 931f                          push    r17
+0001ff 2700                          clr	    r16
+000200 e018                          ldi	    r17, 8
+000201 94f8                          cli
                                  _OW_RD_BYTE_LP:
-0001c2 9506                          lsr	    r16
-0001c3 9ab9                          ow_pull
-0001c4 e030
-0001c5 e04a
-0001c6 d050                          DELAY16	6
-0001c7 98b9                          ow_release
-0001c8 e030
-0001c9 e140
-0001ca d04c                          DELAY16	9
-0001cb 99b1                          sbic    OW_PIN, OW_LINE
-0001cc 6800                          sbr	    r16, (1<<7)
-0001cd e030
-0001ce e64c
-0001cf d047                          DELAY16	55
-0001d0 951a                          dec	    r17
-0001d1 f781                          brne    _OW_RD_BYTE_LP
-0001d2 930c                          st	    X, r16
-0001d3 9478                          sei
-0001d4 911f                          pop	    r17
-0001d5 910f                          pop	    r16
-0001d6 9508                          ret
+000202 9506                          lsr	    r16
+000203 9ab9                          ow_pull
+000204 e030
+000205 e04a
+000206 d050                          DELAY16	6
+000207 98b9                          ow_release
+000208 e030
+000209 e140
+00020a d04c                          DELAY16	9
+00020b 99b1                          sbic    OW_PIN, OW_LINE
+00020c 6800                          sbr	    r16, (1<<7)
+00020d e030
+00020e e64c
+00020f d047                          DELAY16	55
+000210 951a                          dec	    r17
+000211 f781                          brne    _OW_RD_BYTE_LP
+000212 930c                          st	    X, r16
+000213 9478                          sei
+000214 911f                          pop	    r17
+000215 910f                          pop	    r16
+000216 9508                          ret
                                  //</editor-fold>
                                  
                                  
@@ -1554,156 +1738,156 @@ main.asm(288): Including file 'div16u.asm'
                                  ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
                                  ;           путем деления этого числа несколько раз
                                  DISPLAY_UPD_DIGITS:
-0001d7 94f8                          cli
-0001d8 935f                          push  r21
-0001d9 e054                          ldi   r21,    4                     ; (4 раза делим) т.к индикатор четырех разрядный
+000217 94f8                          cli
+000218 935f                          push  r21
+000219 e054                          ldi   r21,    4                     ; (4 раза делим) т.к индикатор четырех разрядный
                                    
                                    ; инициализация указателя (за каждый проход цикла будет инкрементироваться)
-0001da e6a3                          ldi   XL, LOW(DIGITS)
-0001db e0b0                          ldi   XH, HIGH(DIGITS)
+00021a e6a3                          ldi   XL, LOW(DIGITS)
+00021b e0b0                          ldi   XH, HIGH(DIGITS)
                                  
                                      .equ  dividend      = SRAM_TEMP_1   ; число которе будем делить
                                      .equ  divisor       = 10            ; на что делим
                                  
                                    ; загружаем число которое хотим поделить в адрес SRAM делимого
-0001dc 9380 0061                     sts   dividend,     DISP_NUM_L
-0001de 9390 0062                     sts   dividend+1,   DISP_NUM_H
+00021c 9380 0061                     sts   dividend,     DISP_NUM_L
+00021e 9390 0062                     sts   dividend+1,   DISP_NUM_H
                                  
                                    ; четыре раза производим деление для получения остатков
                                  DIV_LOOP:
                                      ; заполняем нужные регистры
-0001e0 9100 0061                     lds   dd16uL, dividend
-0001e2 9110 0062                     lds   dd16uH, dividend+1
-0001e4 e02a                          ldi   dv16uL, LOW(divisor)
-0001e5 e030                          ldi   dv16uH, HIGH(divisor)
+000220 9100 0061                     lds   dd16uL, dividend
+000222 9110 0062                     lds   dd16uH, dividend+1
+000224 e02a                          ldi   dv16uL, LOW(divisor)
+000225 e030                          ldi   dv16uH, HIGH(divisor)
                                      
-0001e6 deda                          rcall div16u                      ; делим
+000226 de9a                          rcall div16u                      ; делим
                                  
-0001e7 92ed                          st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю и увеличиваем его
+000227 92ed                          st   X+,    drem16uL              ; сохраняем остаток в ячейку по указателю и увеличиваем его
                                  
                                      ; обновляем делимое
-0001e8 9300 0061                     sts  dividend,   dres16uL
-0001ea 9310 0062                     sts  dividend+1, dres16uH
+000228 9300 0061                     sts  dividend,   dres16uL
+00022a 9310 0062                     sts  dividend+1, dres16uH
                                  
-0001ec 955a                          dec   r21                         ; декрементируем счетчик цикла
-0001ed f791                          brne  DIV_LOOP                    ; делим еще раз если не 0
-0001ee 915f                          pop   r21
-0001ef 9478                          sei
-0001f0 9508                          ret
+00022c 955a                          dec   r21                         ; декрементируем счетчик цикла
+00022d f791                          brne  DIV_LOOP                    ; делим еще раз если не 0
+00022e 915f                          pop   r21
+00022f 9478                          sei
+000230 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
                                  ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
                                  DISPLAY_DECODER:
-0001f1 930f                          push     r16
-0001f2 931f                          push     r17
-0001f3 e6e0                          ldi	     ZL, LOW(2*DISPLAY_SYMBOLS)
-0001f4 e0f4                          ldi	     ZH, HIGH(2*DISPLAY_SYMBOLS)
+000231 930f                          push     r16
+000232 931f                          push     r17
+000233 eee0                          ldi	     ZL, LOW(2*DISPLAY_SYMBOLS)
+000234 e0f4                          ldi	     ZH, HIGH(2*DISPLAY_SYMBOLS)
                                  
-0001f5 2711                          clr      TEMP_REG_B
-0001f6 0fe0                          add      ZL, TEMP_REG_A
-0001f7 1ff1                          adc      ZH, TEMP_REG_B
+000235 2711                          clr      TEMP_REG_B
+000236 0fe0                          add      ZL, TEMP_REG_A
+000237 1ff1                          adc      ZH, TEMP_REG_B
                                  
-0001f8 9004                          lpm      r0, Z
-0001f9 911f                          pop      r17
-0001fa 910f                          pop      r16
-0001fb 9508                          ret//</editor-fold>
+000238 9004                          lpm      r0, Z
+000239 911f                          pop      r17
+00023a 910f                          pop      r16
+00023b 9508                          ret//</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: короткий писк">
                                  BEEP_SHORT:
-0001fc 9ac5                          sbi	    BUZZER_PORT, BUZZER_PIN
-0001fd d022                          rcall   DELAY
-0001fe 98c5                          cbi	    BUZZER_PORT, BUZZER_PIN
-0001ff 9508                          ret
+00023c 9ac5                          sbi	    BUZZER_PORT, BUZZER_PIN
+00023d d022                          rcall   DELAY
+00023e 98c5                          cbi	    BUZZER_PORT, BUZZER_PIN
+00023f 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: длинный писк">
                                  BEEP_LONG:
-000200 9ac5                          sbi	    BUZZER_PORT, BUZZER_PIN
-000201 d01e                          rcall   DELAY
-000202 d01d                          rcall   DELAY
-000203 d01c                          rcall   DELAY
-000204 d01b                          rcall   DELAY
-000205 98c5                          cbi	    BUZZER_PORT, BUZZER_PIN
-000206 9508                          ret//</editor-fold>
+000240 9ac5                          sbi	    BUZZER_PORT, BUZZER_PIN
+000241 d01e                          rcall   DELAY
+000242 d01d                          rcall   DELAY
+000243 d01c                          rcall   DELAY
+000244 d01b                          rcall   DELAY
+000245 98c5                          cbi	    BUZZER_PORT, BUZZER_PIN
+000246 9508                          ret//</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: устранение дребезга кнопки">
                                  DEBOUNCE_SW:
-000207 930f                          push    r16
-000208 931f                          push    r17
-000209 932f                          push    r18
+000247 930f                          push    r16
+000248 931f                          push    r17
+000249 932f                          push    r18
                                  
-00020a e02a                          ldi	    r18, 10
+00024a e02a                          ldi	    r18, 10
                                  _loop_2:
-00020b ef1f                          ldi     r17, 255
+00024b ef1f                          ldi     r17, 255
                                  _loop_0:
-00020c ef0f                          ldi     r16, 255
+00024c ef0f                          ldi     r16, 255
                                  _dec_0:
-00020d 950a                          dec     r16
-00020e f7f1                          brne    _dec_0
+00024d 950a                          dec     r16
+00024e f7f1                          brne    _dec_0
                                  _loop_1:
-00020f 951a                          dec     r17
-000210 f7d9                          brne    _loop_0
+00024f 951a                          dec     r17
+000250 f7d9                          brne    _loop_0
                                  _loop_3:
-000211 952a                          dec	    r18
-000212 f7c1                          brne    _loop_2
+000251 952a                          dec	    r18
+000252 f7c1                          brne    _loop_2
                                  
-000213 912f                          pop	    r18
-000214 911f                          pop	    r17
-000215 910f                          pop	    r16
-000216 9508                          ret//</editor-fold>
+000253 912f                          pop	    r18
+000254 911f                          pop	    r17
+000255 910f                          pop	    r16
+000256 9508                          ret//</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка (16бит макс число)">
                                  DELAY_LOOP_16:
-000217 5041                          subi DELAY_8_r, 1
-000218 4030                          sbci DELAY_16_r, 0
-000219 f7e8                          brcc DELAY_LOOP_16
-00021a 9508                          ret
+000257 5041                          subi DELAY_8_r, 1
+000258 4030                          sbci DELAY_16_r, 0
+000259 f7e8                          brcc DELAY_LOOP_16
+00025a 9508                          ret
                                  //</editor-fold>
                                      
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка (24бит макс число)">
                                  DELAY_LOOP_24:
-00021b 5041                          subi DELAY_8_r, 1
-00021c 4030                          sbci DELAY_16_r, 0
-00021d 4050                          sbci DELAY_24_r, 0
-00021e f7e0                          brcc DELAY_LOOP_24
-00021f 9508                          ret
+00025b 5041                          subi DELAY_8_r, 1
+00025c 4030                          sbci DELAY_16_r, 0
+00025d 4050                          sbci DELAY_24_r, 0
+00025e f7e0                          brcc DELAY_LOOP_24
+00025f 9508                          ret
                                  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка">
                                  DELAY:
-000220 930f                          push    r16
-000221 931f                          push    r17
-000222 932f                          push    r18
+000260 930f                          push    r16
+000261 931f                          push    r17
+000262 932f                          push    r18
                                  
-000223 e026                          ldi	    r18, 6
+000263 e026                          ldi	    r18, 6
                                  _DELAY_0:
-000224 ef0f                          ldi     r16, 255
+000264 ef0f                          ldi     r16, 255
                                  _DELAY_1:
-000225 ef1f                          ldi     r17, 255   
+000265 ef1f                          ldi     r17, 255   
                                  _DELAY_2:
-000226 951a                          dec     r17         
-000227 f7f1                          brne    _DELAY_2    
+000266 951a                          dec     r17         
+000267 f7f1                          brne    _DELAY_2    
                                  
-000228 950a                          dec     r16
-000229 f7d9                          brne    _DELAY_1    
-00022a 952a                          dec	    r18
-00022b f7c1                          brne    _DELAY_0
+000268 950a                          dec     r16
+000269 f7d9                          brne    _DELAY_1    
+00026a 952a                          dec	    r18
+00026b f7c1                          brne    _DELAY_0
                                  
-00022c 912f                          pop	    r18
-00022d 911f                          pop     r17
-00022e 910f                          pop     r16
-00022f 9508                          ret  //</editor-fold>
+00026c 912f                          pop	    r18
+00026d 911f                          pop     r17
+00026e 910f                          pop     r16
+00026f 9508                          ret  //</editor-fold>
                                  
                                  //<editor-fold defaultstate="collapsed" desc="Символы для индикатора">
                                  DISPLAY_SYMBOLS:
                                        ; HGFEDCBA    HGFEDCBA
-000230 f9c0                          .DB 0b11000000, 0b11111001          ; 0, 1
-000231 b0a4                          .DB 0b10100100, 0b10110000          ; 2, 3
-000232 9299                          .DB 0b10011001, 0b10010010          ; 4, 5
-000233 f882                          .DB 0b10000010, 0b11111000          ; 6, 7
-000234 9080                          .DB 0b10000000, 0b10010000          ; 8, 9
-000235 bf9c                          .DB 0b10011100, 0b10111111          ; °, -//</editor-fold>
+000270 f9c0                          .DB 0b11000000, 0b11111001          ; 0, 1
+000271 b0a4                          .DB 0b10100100, 0b10110000          ; 2, 3
+000272 9299                          .DB 0b10011001, 0b10010010          ; 4, 5
+000273 f882                          .DB 0b10000010, 0b11111000          ; 6, 7
+000274 9080                          .DB 0b10000000, 0b10010000          ; 8, 9
+000275 bf9c                          .DB 0b10011100, 0b10111111          ; °, -//</editor-fold>
                                  
                                  //</editor-fold>
                                  
@@ -1730,38 +1914,38 @@ counted separately from r26..r31 here.
 
 "ATtiny2313A" register use summary:
 x  :   2 y  :   0 z  :   1 r0 :   4 r1 :   2 r2 :   0 r3 :   0 r4 :   0 
-r5 :   0 r6 :   0 r7 :   0 r8 :   6 r9 :   0 r10:   0 r11:   0 r12:   0 
-r13:   0 r14:   5 r15:   5 r16: 114 r17:  50 r18:  33 r19:  45 r20:  38 
-r21:  15 r22:   2 r23:   2 r24:   5 r25:   3 r26:   4 r27:   4 r28:   0 
+r5 :   0 r6 :   0 r7 :   0 r8 :   6 r9 :   0 r10:   2 r11:   2 r12:   2 
+r13:   2 r14:   5 r15:  10 r16: 120 r17:  60 r18:  40 r19:  49 r20:  48 
+r21:  23 r22:   7 r23:   8 r24:   5 r25:   3 r26:   4 r27:   4 r28:   0 
 r29:   0 r30:   2 r31:   2 
-Registers used: 21 out of 35 (60.0%)
+Registers used: 25 out of 35 (71.4%)
 
 "ATtiny2313A" instruction use summary:
-.lds  :   0 .sts  :   0 adc   :   3 add   :   4 adiw  :   1 and   :   0 
+.lds  :   0 .sts  :   0 adc   :   6 add   :   8 adiw  :   1 and   :   0 
 andi  :   1 asr   :   0 bclr  :   0 bld   :   0 brbc  :   0 brbs  :   0 
-brcc  :   4 brcs  :   1 break :   0 breq  :   4 brge  :   3 brhc  :   0 
+brcc  :   6 brcs  :   1 break :   0 breq  :   4 brge  :   3 brhc  :   0 
 brhs  :   0 brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 
-brne  :  19 brpl  :   0 brsh  :   0 brtc  :   1 brts  :   2 brvc  :   0 
-brvs  :   0 bset  :   0 bst   :   0 cbi   :  24 cbr   :   3 clc   :   1 
-clh   :   0 cli   :   5 cln   :   0 clr   :   6 cls   :   0 clt   :   1 
-clv   :   0 clz   :   0 com   :   2 cp    :   2 cpc   :   0 cpi   :  11 
-cpse  :   0 dec   :  10 eor   :   0 icall :   0 ijmp  :   0 in    :   2 
-inc   :   1 ld    :   0 ldd   :   0 ldi   :  81 lds   :  21 lpm   :   2 
-lsl   :   4 lsr   :  10 mov   :  12 movw  :   0 neg   :   2 nop   :   0 
-or    :   1 ori   :   0 out   :  15 pop   :  40 push  :  39 rcall :  49 
-ret   :  20 reti  :   3 rjmp  :  26 rol   :   4 ror   :   4 sbc   :   1 
-sbci  :   3 sbi   :  13 sbic  :   3 sbis  :   5 sbiw  :   1 sbr   :   2 
-sbrc  :   0 sbrs  :   0 sec   :   1 seh   :   0 sei   :   5 sen   :   0 
+brne  :  21 brpl  :   0 brsh  :   0 brtc  :   1 brts  :   2 brvc  :   0 
+brvs  :   0 bset  :   0 bst   :   0 cbi   :  24 cbr   :   3 clc   :   2 
+clh   :   0 cli   :   5 cln   :   0 clr   :  11 cls   :   0 clt   :   1 
+clv   :   0 clz   :   0 com   :   4 cp    :   2 cpc   :   2 cpi   :  11 
+cpse  :   0 dec   :  12 eor   :   0 icall :   0 ijmp  :   0 in    :   2 
+inc   :   1 ld    :   0 ldd   :   0 ldi   :  83 lds   :  24 lpm   :   2 
+lsl   :   4 lsr   :  11 mov   :  18 movw  :   0 neg   :   1 nop   :   0 
+or    :   1 ori   :   0 out   :  15 pop   :  43 push  :  42 rcall :  50 
+ret   :  22 reti  :   3 rjmp  :  26 rol   :   6 ror   :   9 sbc   :   2 
+sbci  :   4 sbi   :  13 sbic  :   3 sbis  :   5 sbiw  :   1 sbr   :   2 
+sbrc  :   0 sbrs  :   0 sec   :   2 seh   :   0 sei   :   5 sen   :   0 
 ser   :   0 ses   :   0 set   :   1 sev   :   0 sez   :   0 sleep :   0 
-spm   :   0 st    :   2 std   :   0 sts   :  21 sub   :   2 subi  :   2 
+spm   :   0 st    :   2 std   :   0 sts   :  23 sub   :   5 subi  :   3 
 swap  :   0 tst   :   2 wdr   :   0 
-Instructions used: 55 out of 105 (52.4%)
+Instructions used: 56 out of 105 (53.3%)
 
 "ATtiny2313A" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x00046c   1098     12   1110    2048  54.2%
-[.dseg] 0x000060 0x000071      0     17     17     128  13.3%
+[.cseg] 0x000000 0x0004ec   1226     12   1238    2048  60.4%
+[.dseg] 0x000060 0x000073      0     19     19     128  14.8%
 [.eseg] 0x000000 0x000000      0      0      0     128   0.0%
 
-Assembly complete, 0 errors, 6 warnings
+Assembly complete, 0 errors, 21 warnings
