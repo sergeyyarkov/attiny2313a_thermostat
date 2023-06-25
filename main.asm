@@ -240,7 +240,7 @@ MCU_INIT:
     rcall   RD_F_CODE		; проверяем что датчик есть на шине
     
     lds	    r16, DEVICE_FAMILY_CODE
-    cpi	    r16, 0x10
+    cpi	    r16, 0x28		; код семейства для DS18B20 = 0x28
     brne    ERR_FAMILY_CODE
     rjmp    START_PROGRAM
     
@@ -280,12 +280,6 @@ _STATE_ERROR:
     cpi		r16, MCU_STATE_ERROR
     brne	LOOP
     sbi		LED_ERR_PORT, LED_ERR_PIN
-    ldi r17, 11
-    sts DIGITS, r17
-    sts DIGITS+1, r17
-    sts DIGITS+2, r17
-    sts DIGITS+3, r17
-    
     rjmp      LOOP
 //</editor-fold>
 
@@ -294,75 +288,54 @@ _STATE_ERROR:
 .INCLUDE "div16u.asm"
    
 TEMP_COMPARSION:
-;    push    r16
-;    push    r17
-;    push    r18
-;    push    r19
-;    push    r20
-;    push    r21
-;    push    r22
-;    
-;    lds	    r16, TEMP_L
-;    lds	    r17, TEMP_H	// всегда 0?
-;    lds	    r18, TEMP_F
+    push    r16
+    push    r17
+    push    r18
+    push    r19
+    push    r20
+    push    r21
+    push    r22
+    
+    lds	    r16, TEMP_L
+    lds	    r17, TEMP_H	// всегда 0?
+    lds	    r18, TEMP_F
 ;    lds	    r19, SETTING_INT
 ;    lds	    r20, SETTING_F
-;    lds	    r21, SETTING_MODE
-;    
-;    brtc    _START_COMPARSION
-;    neg	    r19
-;    
-;_START_COMPARSION:
-;    tst	    r21
-;    brne    _HEATING
-;_COOLING:
-;    rjmp    _COMPARSION_EXIT
-;_HEATING:
-;    cp	    r16, r19
-;    brge    _HEATING_GREATER_OR_E	    ; если целая часть текущей температуры <= уставки - продолжаем сравнение
-;    brtc    PC+3
-;    relay_off
-;    rjmp    PC+2
-;    relay_on	; c
-;    rjmp    _COMPARSION_EXIT
-;_HEATING_GREATER_OR_E:
-;    cp	    r16, r19
-;    breq    _HEATING_GREATER_E
-;    brtc    PC+3
-;    relay_on
-;    rjmp    PC+2
-;    relay_off	; c
-;    rjmp    _COMPARSION_EXIT
-;_HEATING_GREATER_E:
-;    brtc    PC+3
-;    relay_off
-;    rjmp    PC+2
-;    relay_on	; c
-;    cp	    r18, r20
-;    brge    PC+2		    ; если дробная часть текущей температуры >= уставки - выключаем реле
-;    rjmp    _COMPARSION_EXIT
-;_HEATING_GREATER_OR_E_F:
-;    cp	    r18, r20
-;    breq    _HEATING_GREATER_E_F
-;    brtc    PC+3
-;    relay_on
-;    rjmp    PC+2
-;    relay_off	; c
-;    rjmp    _COMPARSION_EXIT
-;_HEATING_GREATER_E_F:
-;    brtc    PC+3
-;    relay_on
-;    rjmp    PC+2
-;    relay_off	; c
-;
-;_COMPARSION_EXIT:
-;    pop	    r22
-;    pop	    r21
-;    pop	    r20
-;    pop	    r19
-;    pop	    r18
-;    pop	    r17
-;    pop	    r16
+    
+    
+    
+    ldi	    r19, 28		    ; min
+    ldi	    r20, 32		    ; max
+    lds	    r21, SETTING_MODE	    ; mode
+    
+    brts    PC+2
+    rjmp    PC+2
+    neg	    r16
+    
+    tst	    r21
+    brne    _HEATING_MODE
+    rjmp    _COMPARSION_EXIT    
+    
+_HEATING_MODE:
+    cp	    r19, r16
+    brge    _HEATING_ON		    ; TEMP <= MIN
+    rjmp    _HEATING_OFF
+_HEATING_ON:
+    relay_on
+    rjmp    _COMPARSION_EXIT
+_HEATING_OFF:
+    cp	    r16, r20
+    brge    PC+2		    ; TEMP >= MAX
+    rjmp    _COMPARSION_EXIT
+    relay_off
+_COMPARSION_EXIT:
+    pop	    r22
+    pop	    r21
+    pop	    r20
+    pop	    r19
+    pop	    r18
+    pop	    r17
+    pop	    r16
     ret
     
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
@@ -387,22 +360,13 @@ RD_F_CODE:
     push	r16
     
     rcall	OW_PRESENCE
-    ldi		r16, DS18B20_CMD_SKIPROM
+    ldi		r16, DS18B20_CMD_READROM
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
-    
-    ldi		r16, DS18B20_CMD_RSCRATCHPAD
-    mov		OW_CMD_r, r16
-    rcall	OW_SEND_BYTE
-    
+        
     ldi		XL, LOW(DEVICE_FAMILY_CODE)
     ldi		XH, HIGH(DEVICE_FAMILY_CODE)
-    
-    ldi		r16, 8
-_RD_L: 
     rcall	OW_RD_BYTE
-    dec		r16
-    brne	_RD_L
     
     pop		r16
     ret//</editor-fold>
@@ -774,12 +738,14 @@ DELAY_LOOP_16:
     ret
 //</editor-fold>
     
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка (24бит макс число)">
 DELAY_LOOP_24:
     subi DELAY_8_r, 1
     sbci DELAY_16_r, 0
     sbci DELAY_24_r, 0
     brcc DELAY_LOOP_24
     ret
+//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка">
 DELAY:
