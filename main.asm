@@ -210,10 +210,10 @@ MCU_INIT:
     outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
   
     ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
-    ;   outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
-    ;   outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
-    ;   outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
-    ;   outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+       outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
+       outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
+       outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
+       outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
     
     ; **** ИНИЦИАЛИЗАЦИЯ ДАННЫХ В ОЗУ ******************************
     clr     r1
@@ -240,7 +240,7 @@ MCU_INIT:
     sts	    TEMP_H, r16
     ldi	    r16, 0xf0
     sts	    TEMP_F, r16
-    
+        
     ; **** СТАРТУЕМ ************************************************
     
     rcall   RD_F_CODE		; проверяем что датчик есть на шине
@@ -266,16 +266,17 @@ START_PROGRAM:
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
 LOOP:
   ; rcall       DISPLAY_UPD_DIGITS
-    lds         r16, MCU_STATE           ; получаем текущее состояние МК
+    lds         r16, MCU_STATE		    ; получаем текущее состояние МК
     
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
     cbi		LED_ERR_PORT, LED_ERR_PIN
     rcall	DISPLAY_UPD_DIGITS
-    rcall	TEMP_UPD
-    outi	r16, TIMSK, (1<<OCIE0A)	  ; вкл. индикатор
-    rcall	TEMP_COMPARSION
+    rcall	TEMP_UPD		    ; обновление данных о температуре
+    outi	r16, TIMSK, (1<<OCIE0A)	    ; вкл. индикатор
+    rcall	TEMP_COMPARSION		    ; логика термостата
+    rcall	TEMP_SEND_UART		    ; отпрака данных в UART
 _STATE_PROGRAM:
     cpi		r16, MCU_STATE_PROGRAM
     brne	_STATE_ERROR
@@ -294,7 +295,42 @@ _STATE_ERROR:
 .INCLUDE "div16u.asm"
 .INCLUDE "div8u.asm"
 .INCLUDE "mpy16u.asm"
+    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: отправка данных в UART">
+TEMP_SEND_UART:
+    push    r16
+    ; целая часть
+    lds	    r16, TEMP_L
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; дробная часть
+    lds	    r16, TEMP_F
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; состояние реле
+    in	    r16, PIND
+    andi    r16, (1<<RELAY_PIN)
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ldi	    r16, 0x04 ; EOT (End Of Transmission)
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    pop	    r16
+    ret
+//</editor-fold>
+ 
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: отправка байта в UART из регистра r5">
+UART_WR_BYTE:
+    sbis    UCSRA, UDRE
+    rjmp    UART_WR_BYTE
+    out	    UDR, r5
+    ret//</editor-fold>
    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: сравнение температуры с уставкой">
 TEMP_COMPARSION:
     push    r16
     push    r17
@@ -302,8 +338,6 @@ TEMP_COMPARSION:
     push    r19
     push    r20
     push    r21
-    push    r22
-    push    r23
 ;    
 ;    lds	    dd8u, SETTING_HYST
 ;    ldi	    dv8u, 10
@@ -395,22 +429,19 @@ _MAX_THRESHOLD:
     rjmp    PC+2
     relay_off
 _COMPARSION_EXIT:
-    pop	    r23
-    pop	    r22
     pop	    r21
     pop	    r20
     pop	    r19
     pop	    r18
     pop	    r17
     pop	    r16
-    ret
+    ret//</editor-fold>
     
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
 TEMP_UPD:
     push    r17
     rcall   TEMP_CONV
-    DELAY24 500000
-    DELAY24 500000
+    DELAY24 800000
     rcall   TEMP_RD
     
     ; обновляем данные в ячейках
@@ -448,6 +479,9 @@ TEMP_RD:
 ;    cli
     
     rcall	OW_PRESENCE
+    sbrs	OWFR, OWPRF
+    rjmp	_TEMP_RD_EXIT
+    
     ldi		r16, DS18B20_CMD_SKIPROM
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
@@ -475,14 +509,16 @@ TEMP_RD:
     rjmp	_TEMP_RD_CONTINUE		; если нет то преобразуем значение АЦП в температуру (делим на 16)
 
 _TEMP_RD_TO_UNSIGNED:
-    pop		r18
+    pop	    r18
     set
-    com	r17
-    com	r18
-    ldi	    r19, 1
-    add	    r17, r19
-    ldi	    r19, 0
-    adc	    r18, r19
+    com	    r17
+    com	    r18
+    subi    r17, low(-1)
+    sbci    r18, high(-1)
+;    ldi	    r19, 1
+;    add	    r17, r19
+;    ldi	    r19, 0
+;    adc	    r18, r19
     rjmp    PC+2
     
 _TEMP_RD_CONTINUE:			    ; Температура = Число с АЦП / 16 (сдвиг вправо 4)
@@ -524,6 +560,7 @@ _TEMP_RD_END:
     sts		TEMP_F, r19
     
 ;    sei
+_TEMP_RD_EXIT:
     pop		r20
     pop		r19
     pop		r18
@@ -536,6 +573,9 @@ TEMP_CONV:
 ;    cli
     
     rcall	OW_PRESENCE
+    sbrs	OWFR, OWPRF
+    rjmp	_TEMP_CONV_EXIT
+    
     ldi		r16, DS18B20_CMD_SKIPROM
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
@@ -545,6 +585,7 @@ TEMP_CONV:
     rcall	OW_SEND_BYTE
     
 ;    sei
+_TEMP_CONV_EXIT:
     pop		r16
     ret
 //</editor-fold>
@@ -636,6 +677,7 @@ _EXIT:
 OW_SEND_BYTE:
     push    r16
     push    r17    
+    cli
     mov	    r16, OW_CMD_r
     ldi	    r17, 8
 _OW_SEND_BYTE_LOOP:
@@ -643,23 +685,20 @@ _OW_SEND_BYTE_LOOP:
     brcc    _OW_SEND_0
     brcs    _OW_SEND_1
 _OW_SEND_0:
-    cli
     ow_pull
     DELAY16 60
     ow_release
     DELAY16 10
-    sei
     rjmp    _OW_SEND_BYTE_END
 _OW_SEND_1:
-    cli
     ow_pull
     DELAY16 6
     ow_release
     DELAY16 64
-    sei
 _OW_SEND_BYTE_END:
     dec	    r17
     brne    _OW_SEND_BYTE_LOOP
+    sei
     pop	    r17
     pop	    r16
     ret
@@ -669,9 +708,9 @@ _OW_SEND_BYTE_END:
 OW_RD_BYTE:
     push    r16
     push    r17
+    cli
     clr	    r16
     ldi	    r17, 8
-    cli
 _OW_RD_BYTE_LP:
     lsr	    r16
     ow_pull
@@ -689,8 +728,6 @@ _OW_RD_BYTE_LP:
     pop	    r16
     ret
 //</editor-fold>
-
-
 //</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновление ячеек в SRAM для индикатора">
