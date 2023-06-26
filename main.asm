@@ -360,7 +360,7 @@ TEMP_COMPARSION:
     
     ; определяем знак температуры
     brts    _NEGATE_TEMP
-    rjmp    _CHECK_MODE
+    rjmp    _COMPARE
 
 _NEGATE_TEMP:
     com	    temp_r_l
@@ -368,26 +368,31 @@ _NEGATE_TEMP:
     subi    temp_r_l, low(-1)
     sbci    temp_r_h, high(-1)
     
-_CHECK_MODE:
-    ; определяем режим работы
-    lds	    r20, SETTING_MODE
-    tst	    r20
-    brne    _HEATING_MODE
-
-_HEATING_MODE:
+_COMPARE:
     ; проверяем нижний порог
     cp	    min_r_trhd_l, temp_r_l
     cpc	    min_r_trhd_h, temp_r_h
-    brge    _HEATING_ON			    ; TEMP <= MIN
+    brge    _MIN_THRESHOLD		    ; TEMP <= MIN
     ; проверяем верхний порог
     cp	    temp_r_l, max_r_trhd_l
     cpc	    temp_r_h, max_r_trhd_h
-    brge    _HEATING_OFF		    ; TEMP >= TOP
+    brge    _MAX_THRESHOLD		    ; TEMP >= TOP
     rjmp    _COMPARSION_EXIT
-_HEATING_ON:
+_MIN_THRESHOLD:
+    ; определяем режим работы
+    lds	    r20, SETTING_MODE
+    tst	    r20
+    brne    PC+3
+    relay_off
+    rjmp    PC+2
     relay_on
     rjmp    _COMPARSION_EXIT
-_HEATING_OFF:
+_MAX_THRESHOLD:
+    lds	    r20, SETTING_MODE
+    tst	    r20
+    brne    PC+3
+    relay_on
+    rjmp    PC+2
     relay_off
 _COMPARSION_EXIT:
     pop	    r23
