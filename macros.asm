@@ -24,6 +24,15 @@
 .MACRO relay_off
     cbi	    RELAY_PORT, RELAY_PIN
 .ENDMACRO
+    
+; @0 - младший байт
+; @1 - старший байт
+.MACRO com16
+    com	    @0
+    com	    @1
+    subi    @0, low(-1)
+    sbci    @1, high(-1)
+.ENDMACRO
         
 .MACRO DELAY16
     ldi    DELAY_16_r, HIGH(@0*F_CPU/4-2)

@@ -89,7 +89,7 @@ TIMER0_COMPA_vect:
     push    r20
     push    r21
     in r21, SREG
-
+    
     lds       r20,  CURRENT_DIGIT
     cpi       r20,  5
     brge      _CLR_CURRENT_DIGIT          ; сброс активного разряда если >= 5
@@ -136,11 +136,11 @@ _indicate_2:
     lds       TEMP_REG_A, DIGITS+1
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
-
+    
 _indicate_3:
     cpi       r20, 2
     brne      _indicate_4
-
+    
     cbi       PORTD, DIGIT_1_PIN
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_4_PIN
@@ -196,7 +196,7 @@ MCU_INIT:
     ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 (8 бит) *************************
     outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
     outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
-    outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
+    outi      r16, OCR0A, 35                     ; число для сравнения. (~60Hz)
     
     ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 1 (16 бит) *************************
 ;    outi      r16, TCCR1A
@@ -644,6 +644,11 @@ _SW_SET_FROM_0_TO_1:
     rcall   BEEP_SHORT
     rjmp    _SW_CHECK_ON_1
 _SAVE_SETTINGS:
+    outi	r17, TIMSK, (0<<OCIE0A)
+    cbi       PORTD, DIGIT_1_PIN
+    cbi       PORTD, DIGIT_2_PIN
+    cbi       PORTD, DIGIT_3_PIN
+    cbi       PORTD, DIGIT_4_PIN
     clr	    REPROGRAM_STEP_r
     rcall   BEEP_LONG
     ldi	    r17, MCU_STATE_DEFAULT
@@ -679,8 +684,8 @@ REPROGRAM_SETTINGS:
     breq    _INTO
     rjmp    _REPROGRAM_SETTINGS_LOOP
 _INTO:
-    inc	    REPROGRAM_STEP_r
     rcall   BEEP_SHORT
+    inc	    REPROGRAM_STEP_r
 _REPROGRAM_SETTINGS_LOOP:
     rcall   BUTTON_PROCESS
 _CHECK_STEP:
@@ -688,8 +693,11 @@ _CHECK_STEP:
     breq    _STEP_1
     cpi	    r16, 2
     breq    _STEP_2
+    cpi	    r16, 3
+    breq    _S3_JMP
     rjmp    _REPROGRAM_SETTINGS_END
-   
+      
+//<editor-fold defaultstate="collapsed" desc="Настройка: шаг 1">
 _STEP_1:				    ; установка и отображение гистерезиса 
     nop
 _S1_CHECK_PLUS:
@@ -703,12 +711,16 @@ _S1_CHECK_MINUS:
 _INCREASE_HYST:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_HYST
+    cpi	    r17, MAX_HYST
+    breq    PC+2
     inc	    r17
     sts	    SETTING_HYST, r17
     rjmp    _SHOW_HYST
 _DECREASE_HYST:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_HYST
+    cpi	    r17, MIN_HYST
+    breq    PC+2
     dec	    r17
     sts	    SETTING_HYST, r17
 _SHOW_HYST:
@@ -723,7 +735,12 @@ _SHOW_HYST:
     pop	    dv8u
     pop	    dd8u
     rjmp    _REPROGRAM_SETTINGS_END
+//</editor-fold>
+   
+_S3_JMP:			    ; просто прыжок на _STEP_3
+    rjmp    _STEP_3
     
+//<editor-fold defaultstate="collapsed" desc="Настройка: шаг 2">
 _STEP_2:
     nop
 _S2_CHECK_PLUS:
@@ -761,6 +778,16 @@ _SHOW_TEMP:
     
     lds	    dd16uL, SETTING_TEMP_L
     lds	    dd16uH, SETTING_TEMP_H
+    mov	    r18, dd16uH
+    andi    r18, (1<<7)
+    brne    _NEGATE_SET_TEMP
+    clt
+    rjmp    _DIVIDE_SET_TEMP
+_NEGATE_SET_TEMP:
+    set
+    com16   dd16uL, dd16uH
+    
+_DIVIDE_SET_TEMP:
     ldi	    dv16uL, LOW(10)
     ldi	    dv16uH, HIGH(10)
     rcall   div16u
@@ -772,6 +799,47 @@ _SHOW_TEMP:
     pop	    dv16uL
     pop	    dd16uH
     pop	    dd16uL
+    rjmp    _REPROGRAM_SETTINGS_END
+//</editor-fold>
+
+//<editor-fold defaultstate="collapsed" desc="Настройка: шаг 3">
+_STEP_3:
+    clt
+_S3_CHECK_PLUS:
+    sbis    SW_PIN, SW_PLUS_PIN
+    rjmp    _SET_HEAT_MODE
+    rjmp    _S3_CHECK_MINUS
+_S3_CHECK_MINUS:
+    sbis    SW_PIN, SW_MINUS_PIN
+    rjmp    _SET_COOLING_MODE
+    rjmp    _SHOW_MODE
+_SET_HEAT_MODE:
+    rcall   DEBOUNCE_SW
+    ldi	    r17, HEAT_MODE
+    sts	    SETTING_MODE, r17
+    rjmp    _SHOW_MODE
+_SET_COOLING_MODE:
+    rcall   DEBOUNCE_SW
+    ldi	    r17, COOLING_MODE
+    sts	    SETTING_MODE, r17
+_SHOW_MODE:
+    clr	    r17
+    mov	    DISP_NUM_L, r17
+    mov	    DISP_NUM_H, r17
+    lds	    r18, SETTING_MODE
+    tst	    r18
+    breq    _SHOW_COOLING
+    rjmp    _SHOW_HEATING
+
+_SHOW_COOLING:
+    ldi	    r17, 12
+    sts	    DIGITS+3, r17
+    rjmp    _REPROGRAM_SETTINGS_END
+_SHOW_HEATING:
+    ldi	    r17, 13
+    sts	    DIGITS+3, r17
+//</editor-fold>
+
 _REPROGRAM_SETTINGS_END:
     pop	    r20
     pop	    r19
@@ -1040,6 +1108,11 @@ DISPLAY_SYMBOLS:
 
 //<editor-fold defaultstate="collapsed" desc="Сегмент EEPROM">
 ; **** СЕГМЕНТ EEPROM ********************************************
-; .ESEG
-; INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov 22.01.2023"
+.ESEG
+ 
+E_SETTING_TEMP_H:	    .BYTE 1
+E_SETTING_TEMP_L:	    .BYTE 1
+E_SETTING_HYST:		    .BYTE 1
+E_SETTING_MODE:		    .BYTE 1
+E_FIRST_TIME_RUN:	    .BYTE 1
 ;</editor-fold>
