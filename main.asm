@@ -755,7 +755,7 @@ _INCREASE_TEMP:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_TEMP_L
     lds	    r18, SETTING_TEMP_H
-    ldi	    r19, 1
+    ldi	    r19, 10
     add	    r17, r19
     clr	    r19
     adc	    r18, r19
@@ -766,7 +766,7 @@ _DECREASE_TEMP:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_TEMP_L
     lds	    r18, SETTING_TEMP_H
-    subi    r17, 1
+    subi    r17, 10
     sbci    r18, 0
     sts	    SETTING_TEMP_L, r17
     sts	    SETTING_TEMP_H, r18
@@ -793,7 +793,9 @@ _DIVIDE_SET_TEMP:
     rcall   div16u
     mov	    DISP_NUM_L, dres16uL
     mov	    DISP_NUM_H, dres16uH
-    sts	    DIGITS+3, drem16uL
+    
+    ldi	    r16, 10
+    sts	    DIGITS+3, r16		; значок градуса
     
     pop	    dv16uH
     pop	    dv16uL
