@@ -25,7 +25,6 @@ MCU_STATE:      .BYTE 1                     ; Текущее состояние 
 SRAM_TEMP_1:    .BYTE 2                     ; Хранения временного 16-бит числа в ячейке
 DIGITS:         .BYTE 4                     ; Ячейки, где хранятся символы, для вывода на индикатор
 CURRENT_DIGIT:  .BYTE 1                     ; Номер разряда индикатора, который сейчас горит
-SW_FLAGS:       .BYTE 1                     ; Состояние кнопок
 TEMP_L:		.BYTE 1			    ; Младший байт температуры
 TEMP_H:		.BYTE 1			    ; Старший байт температуры
 TEMP_F:		.BYTE 1			    ; Дробная часть
@@ -34,8 +33,8 @@ SETTING_TEMP_L:	.BYTE 1			    ; Уставка температуры (млад�
 SETTING_HYST:	.BYTE 1			    ; Гистерезис: отклонение от уставки
 SETTING_MODE:	.BYTE 1			    ; Режим работы: '1' - нагрев; '0' - 'охлаждение'
 DEVICE_FAMILY_CODE: .BYTE 1		    ; Должно быть 0x10 для DS18B20
-SRAM_TEMP_2:	.BYTE 1
-SRAM_TEMP_3:	.BYTE 1
+PROGRAM_STEPS:	.BYTE 1			    ; Текущий "шаг" для настройки (0 - ничего; 1 - уставка T; 2 - гистерезис)
+SW_DATA:	.BYTE 1
 ;//</editor-fold>
 
 
@@ -46,38 +45,28 @@ SRAM_TEMP_3:	.BYTE 1
 //<editor-fold defaultstate="collapsed" desc="Вектора">
 .ORG 0x00     
     rjmp 	RESET_vect
+ 
+.ORG 0x04
+    reti
     
 .ORG 0x000B
-;    rjmp  PCINT0_vect
-    reti
+    rjmp	PCINT0_vect
 
 .ORG 0x000D   
     rjmp	TIMER0_COMPA_vect
+  
 //</editor-fold>
     
 //<editor-fold defaultstate="collapsed" desc="Прерывание: изменение состояния пина">
 PCINT0_vect:
     push    r16
     push    r17
-    push    r18
-    push    r19
     in	    r16, SREG
+    in	    r17, SW_PIN
     
-;    display_off
-    
-;    in	    r17, SW_PIN
-;    clr	    r18
-;    ldi	    r18, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN)
-;    and	    r17, r18
-;    cp	    r17, r18
-;    breq    _PCINT0_vect_end
-    sbic    SW_PIN, SW_SET_PIN
-    rjmp    _PCINT0_vect_end
-    
-    lds	    r18, MCU_STATE
-    cpi	    r18, MCU_STATE_DEFAULT
-    breq    _INTO_PROGRAM_STATE
-    rjmp    _PCINT0_vect_end
+    ; если нажаты две кнопки то входим в режим программирования
+    andi    r17, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN)
+    brne    _PCINT0_vect_end
     
 _INTO_PROGRAM_STATE:
     ldi	    r17, MCU_STATE_PROGRAM
@@ -85,19 +74,20 @@ _INTO_PROGRAM_STATE:
     
 _PCINT0_vect_end:
     out	    SREG, r16
-    pop	    r19
-    pop	    r18
     pop	    r17
     pop	    r16
-    reti//</editor-fold>
+    reti
+//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Прерывание: динамическая индикация">
 ; **** ДИНАМИЧЕСКАЯ ИНДИКАЦИЯ ************************************
 TIMER0_COMPA_vect:
-    push      r20
-    push      r21
-    push      r16
-    push      r17
+    push    r16
+    push    r17
+    push    r18
+    push    r19
+    push    r20
+    push    r21
     in r21, SREG
 
     lds       r20,  CURRENT_DIGIT
@@ -171,19 +161,22 @@ _indicate_4:
     cbi       PORTD, DIGIT_2_PIN
     cbi       PORTD, DIGIT_3_PIN
     sbi       PORTD, DIGIT_4_PIN
-    lds       TEMP_REG_A, TEMP_F
+    lds       TEMP_REG_A, DIGITS+3
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
 _indicate_exit:
     inc       r20
     sts       CURRENT_DIGIT, r20
+    
     out SREG, r21
     
-    pop	r17
-    pop r16
-    pop r21
+    pop	r21
     pop r20
+    pop r19
+    pop r18
+    pop r17
+    pop r16
     reti
 ;//</editor-fold>
 
@@ -200,20 +193,23 @@ MCU_INIT:
     outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
     outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
 
-    ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 **********************************
+    ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 (8 бит) *************************
     outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
     outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
     outi      r16, OCR0A, 25                      ; число для сравнения. (60Hz)
+    
+    ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 1 (16 бит) *************************
+;    outi      r16, TCCR1A
 
     ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
     outi      r16, GIMSK, (1<<PCIE0)
     outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
   
     ; **** ИНИЦИАЛИЗАЦИЯ USART **************************************
-       outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
-       outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
-       outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
-       outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
+    outi      r16, UBRRL, LOW(51)		    ; 9600 БОД
+    outi      r16, UBRRH, HIGH(51)		    ; 9600 БОД
+    outi      r16, UCSRB, (1<<TXEN)		    ; Включение передачии
+    outi      r16, UCSRC, (1<<UCSZ1) | (1<<UCSZ0)   ; Асинхронный режим, 8 бит фрейм, 1 стоповый бит
     
     ; **** ИНИЦИАЛИЗАЦИЯ ДАННЫХ В ОЗУ ******************************
     clr     r1
@@ -240,7 +236,12 @@ MCU_INIT:
     sts	    TEMP_H, r16
     ldi	    r16, 0xf0
     sts	    TEMP_F, r16
+    
+    ser	    r16
+    sts	    SW_DATA, r16
         
+    clr	    REPROGRAM_STEP_r
+    
     ; **** СТАРТУЕМ ************************************************
     
     rcall   RD_F_CODE		; проверяем что датчик есть на шине
@@ -258,31 +259,30 @@ ERR_FAMILY_CODE:
 START_PROGRAM:
     rcall   BEEP_SHORT
     display_load 0
-    
-;    sei
 //</editor-fold>
     
 //<editor-fold defaultstate="collapsed" desc="Главный цикл">
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
 LOOP:
-  ; rcall       DISPLAY_UPD_DIGITS
     lds         r16, MCU_STATE		    ; получаем текущее состояние МК
-    
+    rcall       DISPLAY_UPD_DIGITS
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
     cbi		LED_ERR_PORT, LED_ERR_PIN
-    rcall	DISPLAY_UPD_DIGITS
+  
+    lds		r18, TEMP_F
+    sts		DIGITS+3, r18
+    
     rcall	TEMP_UPD		    ; обновление данных о температуре
-    outi	r16, TIMSK, (1<<OCIE0A)	    ; вкл. индикатор
     rcall	TEMP_COMPARSION		    ; логика термостата
+    outi	r17, TIMSK, (1<<OCIE0A)	    ; вкл. индикатор
     rcall	TEMP_SEND_UART		    ; отпрака данных в UART
 _STATE_PROGRAM:
     cpi		r16, MCU_STATE_PROGRAM
     brne	_STATE_ERROR
     cbi		LED_ERR_PORT, LED_ERR_PIN
-    rcall	DISPLAY_UPD_DIGITS
-    rcall	SW_CHECK_PROCESS
+    rcall	REPROGRAM_SETTINGS
 _STATE_ERROR:
     cpi		r16, MCU_STATE_ERROR
     brne	LOOP
@@ -299,6 +299,8 @@ _STATE_ERROR:
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: отправка данных в UART">
 TEMP_SEND_UART:
     push    r16
+    push    r17
+    
     ; целая часть
     lds	    r16, TEMP_L
     mov	    r5, r16
@@ -319,6 +321,15 @@ TEMP_SEND_UART:
     mov	    r5, r16
     rcall   UART_WR_BYTE
     
+    clr	    r16
+    mov	    r5, r16
+    ldi	    r17, 12
+_TEMP_SEND_UART_L:
+    rcall   UART_WR_BYTE
+    dec	    r17
+    brne    _TEMP_SEND_UART_L
+    
+    pop	    r17
     pop	    r16
     ret
 //</editor-fold>
@@ -338,17 +349,8 @@ TEMP_COMPARSION:
     push    r19
     push    r20
     push    r21
-;    
-;    lds	    dd8u, SETTING_HYST
-;    ldi	    dv8u, 10
-;    rcall   div8u
-;    
-;    ; определение нижнего и верхнего порого срабатывания
-;    lds	    r19, SETTING_INT
-;    mov	    r20, r19
-;    sub	    r19, dres8u			    ; MIN = SET - HYST_INT
-;    add	    r20, dres8u			    ; MAX = SET + HYST_INT
-; 
+    push    r23
+ 
     .DEF    temp_r_l = r16
     .DEF    temp_r_h = r17
     
@@ -370,8 +372,6 @@ TEMP_COMPARSION:
     clr	    r19
     add	    temp_r_l, r18
     adc	    temp_r_h, r19
-    sts	    SRAM_TEMP_2, temp_r_h
-    sts	    SRAM_TEMP_3, temp_r_l
     
     ; определяем нижний и верхний пороги
     lds	    r20, SETTING_TEMP_L
@@ -429,6 +429,7 @@ _MAX_THRESHOLD:
     rjmp    PC+2
     relay_off
 _COMPARSION_EXIT:
+    pop	    r23
     pop	    r21
     pop	    r20
     pop	    r19
@@ -441,7 +442,7 @@ _COMPARSION_EXIT:
 TEMP_UPD:
     push    r17
     rcall   TEMP_CONV
-    DELAY24 800000
+    DELAY24 751000
     rcall   TEMP_RD
     
     ; обновляем данные в ячейках
@@ -476,7 +477,6 @@ TEMP_RD:
     push	r18
     push	r19
     push	r20
-;    cli
     
     rcall	OW_PRESENCE
     sbrs	OWFR, OWPRF
@@ -559,7 +559,6 @@ _TEMP_RD_END:
     sts		TEMP_H, r18
     sts		TEMP_F, r19
     
-;    sei
 _TEMP_RD_EXIT:
     pop		r20
     pop		r19
@@ -570,7 +569,6 @@ _TEMP_RD_EXIT:
 ;    
 TEMP_CONV:
     push	r16
-;    cli
     
     rcall	OW_PRESENCE
     sbrs	OWFR, OWPRF
@@ -584,7 +582,6 @@ TEMP_CONV:
     mov		OW_CMD_r, r16
     rcall	OW_SEND_BYTE
     
-;    sei
 _TEMP_CONV_EXIT:
     pop		r16
     ret
@@ -594,6 +591,7 @@ _TEMP_CONV_EXIT:
 ; **** ОТПРАВКА БАЙТА В СДВИГОВЫЙ РЕГИСТР *************************
 USI_TRANSMIT:
     push      r16
+    push      r0
     out       USIDR, r0            ; Байт для отправки всегда находится в регистре r0. Помещаем данные в регистр USIDR.
 
   ; Enable USI Overflow Interrupt Flag (will be 0 if transfer is not compeleted)
@@ -619,33 +617,183 @@ _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
   ; This will copy byte from 74hc595 shift register into 74hc595 storage register
     sbi      PORTB, USI_LATCH_PIN
     cbi      PORTB, USI_LATCH_PIN
+    pop	     r0
     pop      r16
-    ret//</editor-fold>
+    ret
+//</editor-fold>
 
-//<editor-fold defaultstate="collapsed" desc="Подпрограмма: опрос кнопок">
-SW_CHECK_PROCESS:
+BUTTON_PROCESS:
     push    r16
-    rcall   DEBOUNCE_SW
-    sbis    SW_PIN, SW_PLUS_PIN
-    adiw    DISP_NUM_L, 1
-
-    sbis    SW_PIN, SW_MINUS_PIN
-    sbiw    DISP_NUM_L, 1
-    
+_SW_CHECK_ON_0:
     sbis    SW_PIN, SW_SET_PIN
-    rjmp    _INTO_DEFAULT_STATE
-    rjmp    _SW_CHECK_PROCESS_END
+    rjmp    _SW_SET_0
+    rjmp    _SW_CHECK_ON_1
+_SW_SET_0:
+    lds	    r16, SW_DATA
+    tst	    r16
+    brne    _SW_SET_FROM_0_TO_1
+    rjmp    _SW_CHECK_ON_1
+_SW_SET_FROM_0_TO_1:
+    clr	    r16
+    sts	    SW_DATA, r16
+    rcall   DEBOUNCE_SW
+    inc	    REPROGRAM_STEP_r
+    mov	    r17, REPROGRAM_STEP_r
+    cpi	    r17, 4
+    brge    _SAVE_SETTINGS
+    rcall   BEEP_SHORT
+    rjmp    _SW_CHECK_ON_1
+_SAVE_SETTINGS:
+    clr	    REPROGRAM_STEP_r
+    rcall   BEEP_LONG
+    ldi	    r17, MCU_STATE_DEFAULT
+    sts	    MCU_STATE, r17
+_SW_CHECK_ON_1:
+    sbic    SW_PIN, SW_SET_PIN
+    rjmp    _SW_SET_1
+    rjmp    _BUTTON_PROCESS_END
+_SW_SET_1:
+    lds	    r16, SW_DATA
+    tst	    r16
+    breq    _SW_SET_FROM_1_TO_0
+    rjmp    _BUTTON_PROCESS_END
+_SW_SET_FROM_1_TO_0:
+    ser	    r16
+    sts	    SW_DATA, r16
+    rcall   DEBOUNCE_SW
+_BUTTON_PROCESS_END: 
+    pop	    r16
+    ret
     
-_INTO_DEFAULT_STATE:
-    ldi	    r16, MCU_STATE_DEFAULT
-    sts	    MCU_STATE, r16
-_SW_CHECK_PROCESS_END:
+    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: перепрограммирование параметров">
+REPROGRAM_SETTINGS:
+    push    r16
+    push    r17
+    push    r18
+    push    r19
+    push    r20
+    
+    mov	    r16, REPROGRAM_STEP_r
+    tst	    r16
+    breq    _INTO
+    rjmp    _REPROGRAM_SETTINGS_LOOP
+_INTO:
+    inc	    REPROGRAM_STEP_r
+    rcall   BEEP_SHORT
+_REPROGRAM_SETTINGS_LOOP:
+    rcall   BUTTON_PROCESS
+_CHECK_STEP:
+    cpi	    r16, 1
+    breq    _STEP_1
+    cpi	    r16, 2
+    breq    _STEP_2
+    rjmp    _REPROGRAM_SETTINGS_END
+   
+_STEP_1:				    ; установка и отображение гистерезиса 
+    nop
+_S1_CHECK_PLUS:
+    sbis    SW_PIN, SW_PLUS_PIN
+    rjmp    _INCREASE_HYST
+    rjmp    _S1_CHECK_MINUS
+_S1_CHECK_MINUS:
+    sbis    SW_PIN, SW_MINUS_PIN
+    rjmp    _DECREASE_HYST
+    rjmp    _SHOW_HYST
+_INCREASE_HYST:
+    rcall   DEBOUNCE_SW
+    lds	    r17, SETTING_HYST
+    inc	    r17
+    sts	    SETTING_HYST, r17
+    rjmp    _SHOW_HYST
+_DECREASE_HYST:
+    rcall   DEBOUNCE_SW
+    lds	    r17, SETTING_HYST
+    dec	    r17
+    sts	    SETTING_HYST, r17
+_SHOW_HYST:
+    push    dd8u
+    push    dv8u
+    lds	    dd8u, SETTING_HYST
+    ldi	    dv8u, 10
+    rcall   div8u
+    mov	    DISP_NUM_L, dres8u
+    clr	    DISP_NUM_H			    ; гистерезис 8 битный так что ноль пишем в старший байт
+    sts	    DIGITS+3,	drem8u
+    pop	    dv8u
+    pop	    dd8u
+    rjmp    _REPROGRAM_SETTINGS_END
+    
+_STEP_2:
+    nop
+_S2_CHECK_PLUS:
+    sbis    SW_PIN, SW_PLUS_PIN
+    rjmp    _INCREASE_TEMP
+    rjmp    _S2_CHECK_MINUS
+_S2_CHECK_MINUS:
+    sbis    SW_PIN, SW_MINUS_PIN
+    rjmp    _DECREASE_TEMP
+    rjmp    _SHOW_TEMP
+_INCREASE_TEMP:
+    rcall   DEBOUNCE_SW
+    lds	    r17, SETTING_TEMP_L
+    lds	    r18, SETTING_TEMP_H
+    ldi	    r19, 1
+    add	    r17, r19
+    clr	    r19
+    adc	    r18, r19
+    sts	    SETTING_TEMP_L, r17
+    sts	    SETTING_TEMP_H, r18
+    rjmp    _SHOW_TEMP
+_DECREASE_TEMP:
+    rcall   DEBOUNCE_SW
+    lds	    r17, SETTING_TEMP_L
+    lds	    r18, SETTING_TEMP_H
+    subi    r17, 1
+    sbci    r18, 0
+    sts	    SETTING_TEMP_L, r17
+    sts	    SETTING_TEMP_H, r18
+_SHOW_TEMP:
+    push    dd16uL
+    push    dd16uH
+    push    dv16uL
+    push    dv16uH
+    
+    lds	    dd16uL, SETTING_TEMP_L
+    lds	    dd16uH, SETTING_TEMP_H
+    ldi	    dv16uL, LOW(10)
+    ldi	    dv16uH, HIGH(10)
+    rcall   div16u
+    mov	    DISP_NUM_L, dres16uL
+    mov	    DISP_NUM_H, dres16uH
+    sts	    DIGITS+3, drem16uL
+    
+    pop	    dv16uH
+    pop	    dv16uL
+    pop	    dd16uH
+    pop	    dd16uL
+_REPROGRAM_SETTINGS_END:
+    pop	    r20
+    pop	    r19
+    pop	    r18
+    pop	    r17
     pop	    r16
     ret
 //</editor-fold>
 
+;DBG_LED_TOGGLE:
+;    push    r18
+;    push    r19
+;    in	    r18, PIND
+;    ldi	    r19, (1<<PD0)
+;    eor	    r18, r19
+;    out	    PORTD, r18
+;    pop	    r19
+;    pop	    r18
+;    ret
+    
 //<editor-fold defaultstate="collapsed" desc="Реализация интерфеса 1-Wire">
-//<editor-fold defaultstate="collapsed" desc="1-Wire: оспрос присутствия">
+//<editor-fold defaultstate="collapsed" desc="1-Wire: опрос присутствия">
 ; **** ОПРОС ПРИСУТСТВИЯ УСТРОЙСТВА ******************************
 OW_PRESENCE:
     cli
@@ -675,9 +823,9 @@ _EXIT:
 
 //<editor-fold defaultstate="collapsed" desc="1-Wire: отправка байта">
 OW_SEND_BYTE:
+    cli
     push    r16
     push    r17    
-    cli
     mov	    r16, OW_CMD_r
     ldi	    r17, 8
 _OW_SEND_BYTE_LOOP:
@@ -698,17 +846,17 @@ _OW_SEND_1:
 _OW_SEND_BYTE_END:
     dec	    r17
     brne    _OW_SEND_BYTE_LOOP
-    sei
     pop	    r17
     pop	    r16
+    sei
     ret
 //</editor-fold>
         
 //<editor-fold defaultstate="collapsed" desc="1-Wire: чтение байта">
 OW_RD_BYTE:
+    cli
     push    r16
     push    r17
-    cli
     clr	    r16
     ldi	    r17, 8
 _OW_RD_BYTE_LP:
@@ -723,9 +871,9 @@ _OW_RD_BYTE_LP:
     dec	    r17
     brne    _OW_RD_BYTE_LP
     st	    X, r16
-    sei
     pop	    r17
     pop	    r16
+    sei
     ret
 //</editor-fold>
 //</editor-fold>
@@ -735,10 +883,10 @@ _OW_RD_BYTE_LP:
 ; Описание: Перемещает цифры числа в соответствующие ячейки памяти в SRAM
 ;           путем деления этого числа несколько раз
 DISPLAY_UPD_DIGITS:
-    cli
+    push  r16
     push  r21
-    ldi   r21,    4                     ; (4 раза делим) т.к индикатор четырех разрядный
-  
+    ldi   r21,    3                     
+    
   ; инициализация указателя (за каждый проход цикла будет инкрементироваться)
     ldi   XL, LOW(DIGITS)
     ldi   XH, HIGH(DIGITS)
@@ -769,7 +917,7 @@ DIV_LOOP:
     dec   r21                         ; декрементируем счетчик цикла
     brne  DIV_LOOP                    ; делим еще раз если не 0
     pop   r21
-    sei
+    pop	  r16
     ret
 //</editor-fold>
 
@@ -778,6 +926,7 @@ DIV_LOOP:
 DISPLAY_DECODER:
     push     r16
     push     r17
+    
     ldi	     ZL, LOW(2*DISPLAY_SYMBOLS)
     ldi	     ZH, HIGH(2*DISPLAY_SYMBOLS)
 
@@ -788,12 +937,13 @@ DISPLAY_DECODER:
     lpm      r0, Z
     pop      r17
     pop      r16
-    ret//</editor-fold>
+    ret
+//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: короткий писк">
 BEEP_SHORT:
     sbi	    BUZZER_PORT, BUZZER_PIN
-    rcall   DELAY
+    DELAY24 150000
     cbi	    BUZZER_PORT, BUZZER_PIN
     ret
 //</editor-fold>
@@ -801,12 +951,10 @@ BEEP_SHORT:
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: длинный писк">
 BEEP_LONG:
     sbi	    BUZZER_PORT, BUZZER_PIN
-    rcall   DELAY
-    rcall   DELAY
-    rcall   DELAY
-    rcall   DELAY
+    DELAY24 500000
     cbi	    BUZZER_PORT, BUZZER_PIN
-    ret//</editor-fold>
+    ret
+//</editor-fold>
 
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: устранение дребезга кнопки">
 DEBOUNCE_SW:
@@ -884,7 +1032,9 @@ DISPLAY_SYMBOLS:
     .DB 0b10011001, 0b10010010          ; 4, 5
     .DB 0b10000010, 0b11111000          ; 6, 7
     .DB 0b10000000, 0b10010000          ; 8, 9
-    .DB 0b10011100, 0b10111111          ; °, -//</editor-fold>
+    .DB 0b10011100, 0b10111111          ; °, -
+    .DB 0b11000110, 0b10001001		; C, H
+//</editor-fold>
 
 //</editor-fold>
 
