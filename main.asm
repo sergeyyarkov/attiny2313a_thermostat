@@ -147,7 +147,6 @@ _indicate_3:
     sbi       PORTD, DIGIT_3_PIN
     lds       TEMP_REG_A, DIGITS
     rcall     DISPLAY_DECODER
-    ; зажигаем точку
     mov	      r16, r0
     cbr	      r16, (1<<7)
     mov	      r0, r16
@@ -189,7 +188,7 @@ RESET_vect:
 ; **** ПРОЦЕСС ИНИЦИАЛИЗАЦИИ МК **********************************
 MCU_INIT:
     ; **** ИНИЦИАЛИЗАЦИЯ ПИНОВ *************************************
-    outi      r16, DDRD, (1<<LED_ERR_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
+    outi      r16, DDRD, (1<<LED_PGM_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
     outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
     outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
 
@@ -218,19 +217,38 @@ MCU_INIT:
     ldi     r16, 0x00
     sts     MCU_STATE,      r16	    ; переводим МК сразу в режим измерения температуры
     
-    ; настройка параметров
-    ldi	    r16, DEFAULT_SETTING_TEMP_L
-    sts	    SETTING_TEMP_L, r16			; уставка LOW
+    ; проверяем впервые ли запускаем устройство
+    ldi	    r16, EEP_FIRST_TIME_RUN
+    mov	    EEP_A_r, r16
+    rcall   EEP_RD_BYTE
+    mov	    r16, EEP_D_r
+    cpi	    r16, 0x10				; 0x10 - зарезервированное число которое говорит о том что устройство запускается НЕ впервые
+    breq    _INIT_PARAMS
+_FIRST_TIME_RUN:				; если устройство запускается впервые то записываем в EEPROM и ОЗУ стандартные параметры
+    rcall   INIT_DEFAULT_PARAMS
+    rjmp    _CONTINUE_INIT 
+_INIT_PARAMS:					; иначе берем из EEPROM настройки и записываем в ОЗУ
+    ldi	    r16, EEP_SETTING_TEMP_H
+    mov	    EEP_A_r, r16
+    rcall   EEP_RD_BYTE
+    sts	    SETTING_TEMP_H, EEP_D_r
     
-    ldi	    r16, DEFAULT_SETTING_TEMP_H
-    sts	    SETTING_TEMP_H, r16			; уставка HIGH
+    ldi	    r16, EEP_SETTING_TEMP_L
+    mov	    EEP_A_r, r16
+    rcall   EEP_RD_BYTE
+    sts	    SETTING_TEMP_L, EEP_D_r
     
-    ldi	    r16, DEFAULT_SETTING_HYST
-    sts	    SETTING_HYST, r16			; гистерезис
+    ldi	    r16, EEP_SETTING_HYST
+    mov	    EEP_A_r, r16
+    rcall   EEP_RD_BYTE
+    sts	    SETTING_HYST, EEP_D_r
     
-    ldi	    r16, DEFAULT_SETTING_MODE
-    sts	    SETTING_MODE, r16			; режим работы
+    ldi	    r16, EEP_SETTING_MODE
+    mov	    EEP_A_r, r16
+    rcall   EEP_RD_BYTE
+    sts	    SETTING_MODE, EEP_D_r
     
+_CONTINUE_INIT:
     clr	    r16
     sts	    TEMP_L, r16
     sts	    TEMP_H, r16
@@ -265,28 +283,32 @@ START_PROGRAM:
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
 LOOP:
     lds         r16, MCU_STATE		    ; получаем текущее состояние МК
-    rcall       DISPLAY_UPD_DIGITS
+;    rcall       DISPLAY_UPD_DIGITS
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
-    cbi		LED_ERR_PORT, LED_ERR_PIN
   
     lds		r18, TEMP_F
     sts		DIGITS+3, r18
     
     rcall	TEMP_UPD		    ; обновление данных о температуре
+    rcall       DISPLAY_UPD_DIGITS
     rcall	TEMP_COMPARSION		    ; логика термостата
     outi	r17, TIMSK, (1<<OCIE0A)	    ; вкл. индикатор
     rcall	TEMP_SEND_UART		    ; отпрака данных в UART
 _STATE_PROGRAM:
     cpi		r16, MCU_STATE_PROGRAM
     brne	_STATE_ERROR
-    cbi		LED_ERR_PORT, LED_ERR_PIN
     rcall	REPROGRAM_SETTINGS
 _STATE_ERROR:
     cpi		r16, MCU_STATE_ERROR
     brne	LOOP
-    sbi		LED_ERR_PORT, LED_ERR_PIN
+    ldi		r17, 11
+    sts		DIGITS, r17
+    sts		DIGITS+1, r17
+    sts		DIGITS+2, r17
+    sts		DIGITS+3, r17
+    outi	r17, TIMSK, (1<<OCIE0A)
     rjmp      LOOP
 //</editor-fold>
 
@@ -339,8 +361,118 @@ UART_WR_BYTE:
     sbis    UCSRA, UDRE
     rjmp    UART_WR_BYTE
     out	    UDR, r5
+    ret
+//</editor-fold>
+    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: инициализация стандартных параметров">
+INIT_DEFAULT_PARAMS:
+    ldi	    r16, DEFAULT_SETTING_TEMP_H
+    sts	    SETTING_TEMP_H, r16			; уставка HIGH
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_TEMP_H
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    
+    ldi	    r16, DEFAULT_SETTING_TEMP_L
+    sts	    SETTING_TEMP_L, r16			; уставка LOW
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_TEMP_L
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+
+    ldi	    r16, DEFAULT_SETTING_HYST
+    sts	    SETTING_HYST, r16			; гистерезис
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_HYST
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+
+    ldi	    r16, DEFAULT_SETTING_MODE
+    sts	    SETTING_MODE, r16			; режим
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_MODE
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    
+    ldi	    r16, 0x10
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_FIRST_TIME_RUN
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    ret
+//</editor-fold>
+    
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: запись параметров из ОЗУ в EEPROM">
+WRITE_PARAMS_TO_EEP:
+    push    r16
+    lds	    r16, SETTING_TEMP_H			; уставка HIGH
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_TEMP_H
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    
+    lds	    r16, SETTING_TEMP_L			; уставка LOW
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_TEMP_L
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    
+    lds	    r16, SETTING_HYST			; гистерезис
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_HYST
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    
+    lds	    r16, SETTING_MODE			; режим
+    mov	    EEP_D_r, r16
+    ldi	    r16, EEP_SETTING_MODE
+    mov	    EEP_A_r, r16
+    rcall   EEP_WR_BYTE
+    pop	    r16
     ret//</editor-fold>
-   
+
+//<editor-fold defaultstate="collapsed" desc="Подпрограммы: запись и чтение байта из EEPROM">
+EEP_WR_BYTE:
+    cli
+    push    r16
+_EEP_WR_BYTE_LP:
+    ; ждем завершения предыдущей записи
+    sbic    EECR, EEPE
+    rjmp    _EEP_WR_BYTE_LP
+    
+    ; режим программирования - атомарный
+    ldi	    r16, (0<<EEPM1) | (0<<EEPM0)
+    out	    EECR, r16
+    
+    ; выставляем адресс куда записывать
+    out	    EEARL, EEP_A_r
+    
+    ; помещаем данные
+    out	    EEDR, EEP_D_r
+    
+    ; запись
+    sbi	    EECR, EEMPE
+    sbi	    EECR, EEPE
+    pop	    r16
+    sei
+    ret
+ 
+EEP_RD_BYTE:
+    cli
+_EEP_RD_BYTE_LP:
+    ; ждем завершения предыдущей записи
+    sbic    EECR, EEPE
+    rjmp    _EEP_RD_BYTE_LP
+    
+    ; выставляем адресс откуда читать
+    out	    EEARL, EEP_A_r
+    
+    ; читаем
+    sbi	    EECR, EERE
+    in	    EEP_D_r, EEDR
+    sei
+    ret//</editor-fold>
+
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: сравнение температуры с уставкой">
 TEMP_COMPARSION:
     push    r16
@@ -436,7 +568,8 @@ _COMPARSION_EXIT:
     pop	    r18
     pop	    r17
     pop	    r16
-    ret//</editor-fold>
+    ret
+//</editor-fold>
     
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: обновляем данные о температуре">
 TEMP_UPD:
@@ -644,13 +777,15 @@ _SW_SET_FROM_0_TO_1:
     rcall   BEEP_SHORT
     rjmp    _SW_CHECK_ON_1
 _SAVE_SETTINGS:
-    outi	r17, TIMSK, (0<<OCIE0A)
-    cbi       PORTD, DIGIT_1_PIN
-    cbi       PORTD, DIGIT_2_PIN
-    cbi       PORTD, DIGIT_3_PIN
-    cbi       PORTD, DIGIT_4_PIN
+    outi    r17, TIMSK, (0<<OCIE0A)
+    cbi     PORTD, DIGIT_1_PIN
+    cbi     PORTD, DIGIT_2_PIN
+    cbi     PORTD, DIGIT_3_PIN
+    cbi     PORTD, DIGIT_4_PIN
     clr	    REPROGRAM_STEP_r
+    rcall   WRITE_PARAMS_TO_EEP
     rcall   BEEP_LONG
+    cbi	    PORTD, LED_PGM_PIN
     ldi	    r17, MCU_STATE_DEFAULT
     sts	    MCU_STATE, r17
 _SW_CHECK_ON_1:
@@ -684,6 +819,8 @@ REPROGRAM_SETTINGS:
     breq    _INTO
     rjmp    _REPROGRAM_SETTINGS_LOOP
 _INTO:
+    relay_off
+    sbi	    PORTD, LED_PGM_PIN
     rcall   BEEP_SHORT
     inc	    REPROGRAM_STEP_r
 _REPROGRAM_SETTINGS_LOOP:
@@ -699,7 +836,7 @@ _CHECK_STEP:
       
 //<editor-fold defaultstate="collapsed" desc="Настройка: шаг 1">
 _STEP_1:				    ; установка и отображение гистерезиса 
-    nop
+    rcall       DISPLAY_UPD_DIGITS
 _S1_CHECK_PLUS:
     sbis    SW_PIN, SW_PLUS_PIN
     rjmp    _INCREASE_HYST
@@ -742,7 +879,7 @@ _S3_JMP:			    ; просто прыжок на _STEP_3
     
 //<editor-fold defaultstate="collapsed" desc="Настройка: шаг 2">
 _STEP_2:
-    nop
+    rcall       DISPLAY_UPD_DIGITS
 _S2_CHECK_PLUS:
     sbis    SW_PIN, SW_PLUS_PIN
     rjmp    _INCREASE_TEMP
@@ -755,6 +892,10 @@ _INCREASE_TEMP:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_TEMP_L
     lds	    r18, SETTING_TEMP_H
+    cpi	    r17, MAX_TEMP_L
+    ldi	    r19, MAX_TEMP_H
+    cpc	    r18, r19
+    breq    PC+7
     ldi	    r19, 10
     add	    r17, r19
     clr	    r19
@@ -766,6 +907,11 @@ _DECREASE_TEMP:
     rcall   DEBOUNCE_SW
     lds	    r17, SETTING_TEMP_L
     lds	    r18, SETTING_TEMP_H
+    cpi	    r17, MIN_TEMP_L
+    ldi	    r19, MIN_TEMP_H
+    cpc	    r18, r19
+    breq    PC+3
+__DECREASE:
     subi    r17, 10
     sbci    r18, 0
     sts	    SETTING_TEMP_L, r17
@@ -828,6 +974,10 @@ _SHOW_MODE:
     clr	    r17
     mov	    DISP_NUM_L, r17
     mov	    DISP_NUM_H, r17
+    ldi	    r17, 14
+    sts	    DIGITS, r17
+    sts	    DIGITS+1, r17
+    sts	    DIGITS+2, r17
     lds	    r18, SETTING_MODE
     tst	    r18
     breq    _SHOW_COOLING
@@ -850,17 +1000,6 @@ _REPROGRAM_SETTINGS_END:
     pop	    r16
     ret
 //</editor-fold>
-
-;DBG_LED_TOGGLE:
-;    push    r18
-;    push    r19
-;    in	    r18, PIND
-;    ldi	    r19, (1<<PD0)
-;    eor	    r18, r19
-;    out	    PORTD, r18
-;    pop	    r19
-;    pop	    r18
-;    ret
     
 //<editor-fold defaultstate="collapsed" desc="Реализация интерфеса 1-Wire">
 //<editor-fold defaultstate="collapsed" desc="1-Wire: опрос присутствия">
@@ -1069,31 +1208,6 @@ DELAY_LOOP_24:
     ret
 //</editor-fold>
 
-//<editor-fold defaultstate="collapsed" desc="Подпрограмма: задержка">
-DELAY:
-    push    r16
-    push    r17
-    push    r18
-
-    ldi	    r18, 6
-_DELAY_0:
-    ldi     r16, 255
-_DELAY_1:
-    ldi     r17, 255   
-_DELAY_2:
-    dec     r17         
-    brne    _DELAY_2    
-
-    dec     r16
-    brne    _DELAY_1    
-    dec	    r18
-    brne    _DELAY_0
-
-    pop	    r18
-    pop     r17
-    pop     r16
-    ret  //</editor-fold>
-
 //<editor-fold defaultstate="collapsed" desc="Символы для индикатора">
 DISPLAY_SYMBOLS:
       ; HGFEDCBA    HGFEDCBA
@@ -1112,9 +1226,6 @@ DISPLAY_SYMBOLS:
 ; **** СЕГМЕНТ EEPROM ********************************************
 .ESEG
  
-E_SETTING_TEMP_H:	    .BYTE 1
-E_SETTING_TEMP_L:	    .BYTE 1
-E_SETTING_HYST:		    .BYTE 1
-E_SETTING_MODE:		    .BYTE 1
-E_FIRST_TIME_RUN:	    .BYTE 1
+.ORG 0x30
+INFO:       .DB "AVR Thermostat. Written by Sergey Yarkov"
 ;</editor-fold>

@@ -7,6 +7,8 @@
 .DEF DELAY_24_r			= r21
 .DEF DISP_NUM_L                 = r24		; LSB числа которое сейчас на индикаторе
 .DEF DISP_NUM_H                 = r25		; MSB числа которое сейчас на индикаторе
+.DEF EEP_A_r			= r3
+.DEF EEP_D_r			= r4
 .DEF REPROGRAM_STEP_r		= r6
 
 .EQU DIGIT_1_PIN                = PD2		; Пин разряда индикатора 1
@@ -14,8 +16,8 @@
 .EQU DIGIT_3_PIN                = PD4		; Пин разряда индикатора 3
 .EQU DIGIT_4_PIN                = PD5		; Пин разряда индикатора 4
 
-.EQU LED_ERR_PIN		= PD6		; Светодиод который говорит о том, что МК в состоянии ошибки 
-.EQU LED_ERR_PORT		= PORTD
+.EQU LED_PGM_PIN		= PD6		; Светодиод который говорит о том, что МК в состоянии настройки 
+.EQU LED_PGM_PORT		= PORTD
     
 .EQU OW_LINE			= PB1		; Пин шины 1-Wire
 .EQU OW_DDR			= DDRB
@@ -64,6 +66,11 @@
 .EQU MIN_HYST			= 1		; минимальный гистерезис который можно выставить - 0.1
 .EQU MAX_HYST			= 200		; максимальный гистерезис который можно выставить - 20
     
+.EQU MIN_TEMP_H			= 0xfe
+.EQU MIN_TEMP_L			= 0x0c		; минимум -50 градусов уставка
+.EQU MAX_TEMP_H			= 0x04		; максимум 120 градусов уставка
+.EQU MAX_TEMP_L			= 0xb0		
+    
 ; **** СТАНДАРТНЫЕ ПАРАМЕТРЫ ***********************************
 
 .EQU DEFAULT_TEMP		= 300			    ; 30 градусов
@@ -78,3 +85,9 @@
 .EQU DEFAULT_SETTING_TEMP_H	= HIGH(DEFAULT_TEMP)
 .EQU DEFAULT_SETTING_HYST	= DEFAULT_HYST
 .EQU DEFAULT_SETTING_MODE	= DEFAULT_MODE
+    
+.EQU EEP_SETTING_TEMP_H		= 0x00
+.EQU EEP_SETTING_TEMP_L		= 0x01
+.EQU EEP_SETTING_HYST		= 0x02
+.EQU EEP_SETTING_MODE		= 0x03
+.EQU EEP_FIRST_TIME_RUN		= 0x04
