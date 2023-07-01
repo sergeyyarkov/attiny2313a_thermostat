@@ -147,9 +147,6 @@ _indicate_3:
     sbi       PORTD, DIGIT_3_PIN
     lds       TEMP_REG_A, DIGITS
     rcall     DISPLAY_DECODER
-    mov	      r16, r0
-    cbr	      r16, (1<<7)
-    mov	      r0, r16
     rcall     USI_TRANSMIT
 
 _indicate_4:
@@ -197,9 +194,6 @@ MCU_INIT:
     outi      r16, TCCR0B, (1<<CS02) | (1<<CS00)  ; 1024 делитель
     outi      r16, OCR0A, 35                     ; число для сравнения. (~60Hz)
     
-    ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 1 (16 бит) *************************
-;    outi      r16, TCCR1A
-
     ; **** ПРЕРЫВАНИЕ ПО ИЗМЕНЕНИЮ СОСТОЯНИЯ ПИНОВ ******************
     outi      r16, GIMSK, (1<<PCIE0)
     outi      r16, PCMSK0, (1<<PCINT2) | (1<<PCINT3) | (1<<PCINT4)          ; для кнопок
@@ -283,7 +277,6 @@ START_PROGRAM:
 ; **** ГЛАВНЫЙ ЦИКЛ **********************************************
 LOOP:
     lds         r16, MCU_STATE		    ; получаем текущее состояние МК
-;    rcall       DISPLAY_UPD_DIGITS
 _STATE_DEFAULT:
     cpi		r16, MCU_STATE_DEFAULT
     brne	_STATE_PROGRAM
@@ -861,6 +854,7 @@ _DECREASE_HYST:
     dec	    r17
     sts	    SETTING_HYST, r17
 _SHOW_HYST:
+    clt
     push    dd8u
     push    dv8u
     lds	    dd8u, SETTING_HYST
@@ -1093,7 +1087,7 @@ _OW_RD_BYTE_LP:
 ;           путем деления этого числа несколько раз
 DISPLAY_UPD_DIGITS:
     push  r16
-    push  r21
+    push  r21 
     ldi   r21,    3                     
     
   ; инициализация указателя (за каждый проход цикла будет инкрементироваться)
@@ -1144,6 +1138,26 @@ DISPLAY_DECODER:
     adc      ZH, TEMP_REG_B
 
     lpm      r0, Z
+    
+    lds	      r16, CURRENT_DIGIT
+    cpi	      r16, 2
+    breq      _DOT_ON
+    rjmp      _DISPLAY_DECODER_EXIT
+_DOT_ON:
+    mov	      r16, r0
+    cbr	      r16, (1<<7)
+    mov	      r0, r16
+    
+    mov	      r16, REPROGRAM_STEP_r
+    cpi	      r16, 2
+    brge      _DOT_OFF
+    rjmp      _DISPLAY_DECODER_EXIT
+_DOT_OFF:
+    mov	      r16, r0
+    sbr	      r16, (1<<7)
+    mov	      r0, r16
+
+_DISPLAY_DECODER_EXIT:
     pop      r17
     pop      r16
     ret
