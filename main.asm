@@ -8,7 +8,7 @@
 ; Clock frequency: 8 MHz External Crystal Oscillator
 ; Fuses: lfuse: 0xCF, hfuse: 0xDF, efuse: 0xFF, lock: 0xFF
 ;
-; Written by Sergey Yarkov 05.07.2023
+; Written by Sergey Yarkov 01.07.2023
 
 .LIST
 
