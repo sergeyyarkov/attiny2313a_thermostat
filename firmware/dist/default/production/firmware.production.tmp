@@ -1,7 +1,7 @@
 <ASSEMBLER_INFO>
  <VERSION>2.2.7</VERSION>
  <DEVICE>"ATtiny2313A"</DEVICE>
- <WORKING_DIR>Z:\home\sergeyyarkov\Documents\Projects\Firmwares\AVR\attiny2313a_thermostat.X</WORKING_DIR>
+ <WORKING_DIR>Z:\home\sergeyyarkov\Documents\Projects\Firmwares\AVR\attiny2313a_thermostat\firmware</WORKING_DIR>
  <INCLUDE_PATH>
   <DIR>/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc</DIR>
   <DIR></DIR>
@@ -16,14 +16,14 @@
   <FILE>mpy16u.asm</FILE>
  </INCLUDED_FILES>
  <OBJECT_FILES>
-  <FILE>dist/default/production/attiny2313a_thermostat.X.production.obj</FILE>
+  <FILE>dist/default/production/firmware.production.obj</FILE>
  </OBJECT_FILES>
  <HEX_FILES>
-  <FILE>dist/default/production/attiny2313a_thermostat.X.production.hex</FILE>
+  <FILE>dist/default/production/firmware.production.hex</FILE>
  </HEX_FILES>
  <OUTPUT_FILES>
-  <FILE>dist/default/production/attiny2313a_thermostat.X.production.map</FILE>
-  <FILE>dist/default/production/attiny2313a_thermostat.X.production.lss</FILE>
+  <FILE>dist/default/production/firmware.production.map</FILE>
+  <FILE>dist/default/production/firmware.production.lss</FILE>
  </OUTPUT_FILES>
  <LABELS>
   <MCU_STATE><FILE>main.asm</FILE><LINE>23</LINE></MCU_STATE>

@@ -30,12 +30,12 @@ ifeq ($(TYPE_IMAGE), DEBUG_RUN)
 IMAGE_TYPE=debug
 OUTPUT_SUFFIX=obj
 DEBUGGABLE_SUFFIX=obj
-FINAL_IMAGE=${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+FINAL_IMAGE=${DISTDIR}/firmware.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 else
 IMAGE_TYPE=production
 OUTPUT_SUFFIX=obj
 DEBUGGABLE_SUFFIX=obj
-FINAL_IMAGE=${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+FINAL_IMAGE=${DISTDIR}/firmware.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 endif
 
 ifeq ($(COMPARE_BUILD), true)
@@ -91,7 +91,7 @@ FIXDEPS=fixDeps
 ifneq ($(INFORMATION_MESSAGE), )
 	@echo $(INFORMATION_MESSAGE)
 endif
-	${MAKE}  -f nbproject/Makefile-default.mk ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+	${MAKE}  -f nbproject/Makefile-default.mk ${DISTDIR}/firmware.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
 
 # ------------------------------------------------------------------------------------
 # Rules for buildStep: assemble
@@ -100,22 +100,22 @@ ${OBJECTDIR}/main.obj: main.asm  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} ${DISTDIR} 
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/main.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp main.asm
+	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/firmware.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -m ${DISTDIR}/firmware.${IMAGE_TYPE}.map  -S ${DISTDIR}/firmware.${IMAGE_TYPE}.tmp main.asm
 else
 ${OBJECTDIR}/main.obj: main.asm  nbproject/Makefile-${CND_CONF}.mk 
 	@${MKDIR} ${DISTDIR} 
 	@${MKDIR} "${OBJECTDIR}" 
 	@${RM} ${OBJECTDIR}/main.obj 
-	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.hex  -m ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.map  -l ${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.lss main.asm
+	${MP_AS}  -fI -W+ie ${PACK_ASSEMBLER_OPTIONS} -d ${DISTDIR}/firmware.${IMAGE_TYPE}.${DEBUGGABLE_SUFFIX}  -S ${DISTDIR}/firmware.${IMAGE_TYPE}.tmp  -o ${DISTDIR}/firmware.${IMAGE_TYPE}.hex  -m ${DISTDIR}/firmware.${IMAGE_TYPE}.map  -l ${DISTDIR}/firmware.${IMAGE_TYPE}.lss main.asm
 endif
 
 # ------------------------------------------------------------------------------------
 # Rules for buildStep: link
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
-${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk    
+${DISTDIR}/firmware.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk    
 	
 else
-${DISTDIR}/attiny2313a_thermostat.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk   
+${DISTDIR}/firmware.${IMAGE_TYPE}.${OUTPUT_SUFFIX}: ${OBJECTFILES}  nbproject/Makefile-${CND_CONF}.mk   
 	
 endif
 

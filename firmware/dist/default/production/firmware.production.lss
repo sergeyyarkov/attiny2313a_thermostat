@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  main.asm Sat Jul 01 13:22:52 2023
+AVRASM ver. 2.2.7  main.asm Sat Jul 01 18:14:26 2023
 
 [builtin](2): Including file '/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc\tn2313Adef.inc'
 main.asm(15): Including file 'definitions.asm'
@@ -763,7 +763,7 @@ main.asm(314): Including file 'mpy16u.asm'
                                  ; Clock frequency: 8 MHz External Crystal Oscillator
                                  ; Fuses: lfuse: 0xCF, hfuse: 0xDF, efuse: 0xFF, lock: 0xFF
                                  ;
-                                 ; Written by Sergey Yarkov 05.07.2023
+                                 ; Written by Sergey Yarkov 01.07.2023
                                  
                                  .LIST
                                  
