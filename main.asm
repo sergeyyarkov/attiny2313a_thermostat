@@ -6,15 +6,14 @@
 ; Device Datasheet: http://ww1.microchip.com/downloads/en/DeviceDoc/doc8246.pdf
 ; Assembler: AVR macro assembler 2.2.7
 ; Clock frequency: 8 MHz External Crystal Oscillator
-; Fuses: lfuse: 0xCF, hfuse: 0x9F, efuse: 0xFF, lock: 0xFF
+; Fuses: lfuse: 0xCF, hfuse: 0xDF, efuse: 0xFF, lock: 0xFF
 ;
-; Written by Sergey Yarkov 22.01.2023
+; Written by Sergey Yarkov 05.07.2023
 
 .LIST
 
 .INCLUDE "definitions.asm"
 .INCLUDE "macros.asm"
-
 
 //<editor-fold defaultstate="collapsed" desc="Сегмент данных">
 ; **** СЕГМЕНТ ДАННЫХ ********************************************
@@ -68,6 +67,10 @@ PCINT0_vect:
     andi    r17, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN)
     brne    _PCINT0_vect_end
     
+    lds	    r17, MCU_STATE
+    cpi	    r17, MCU_STATE_DEFAULT
+    breq    _INTO_PROGRAM_STATE
+    rjmp    _PCINT0_vect_end
 _INTO_PROGRAM_STATE:
     ldi	    r17, MCU_STATE_PROGRAM
     sts	    MCU_STATE, r17
@@ -304,7 +307,6 @@ _STATE_ERROR:
     outi	r17, TIMSK, (1<<OCIE0A)
     rjmp      LOOP
 //</editor-fold>
-
 
 ; **** ПОДПРОГРАММЫ **********************************************
 .INCLUDE "div16u.asm"
@@ -748,6 +750,7 @@ _USI_TRANSMIT_LOOP:             ; Execute loop when USIOIF is 0
     ret
 //</editor-fold>
 
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: обработка нажатия кнопки SET">
 BUTTON_PROCESS:
     push    r16
 _SW_CHECK_ON_0:
@@ -796,8 +799,7 @@ _SW_SET_FROM_1_TO_0:
     rcall   DEBOUNCE_SW
 _BUTTON_PROCESS_END: 
     pop	    r16
-    ret
-    
+    ret//</editor-fold>
     
 //<editor-fold defaultstate="collapsed" desc="Подпрограмма: перепрограммирование параметров">
 REPROGRAM_SETTINGS:
@@ -1124,7 +1126,7 @@ DIV_LOOP:
     ret
 //</editor-fold>
 
-//<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
+   //<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
 ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
 DISPLAY_DECODER:
     push     r16
@@ -1151,12 +1153,19 @@ _DOT_ON:
     mov	      r16, REPROGRAM_STEP_r
     cpi	      r16, 2
     brge      _DOT_OFF
+    lds	      r16, MCU_STATE
+    cpi	      r16, MCU_STATE_ERROR
+    breq      _ERR_DOT_OFF
     rjmp      _DISPLAY_DECODER_EXIT
 _DOT_OFF:
     mov	      r16, r0
     sbr	      r16, (1<<7)
     mov	      r0, r16
-
+    rjmp      _DISPLAY_DECODER_EXIT
+    
+_ERR_DOT_OFF:
+    rjmp      _DOT_OFF
+    
 _DISPLAY_DECODER_EXIT:
     pop      r17
     pop      r16
