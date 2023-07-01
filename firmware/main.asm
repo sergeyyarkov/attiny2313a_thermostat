@@ -334,13 +334,42 @@ TEMP_SEND_UART:
     mov	    r5, r16
     rcall   UART_WR_BYTE
     
+    ; гистерезис
+    lds	    r16, SETTING_HYST
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; уставка HIGH
+    lds	    r16, SETTING_TEMP_H
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; уставка LOW
+    lds	    r16, SETTING_TEMP_L
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; режим работы
+    lds	    r16, SETTING_MODE
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; состояние МК
+    lds	    r16, MCU_STATE
+    mov	    r5, r16
+    rcall   UART_WR_BYTE
+    
+    ; статусный регистр МК
+    in	    r5, SREG
+    rcall   UART_WR_BYTE
+    
     ldi	    r16, 0x04 ; EOT (End Of Transmission)
     mov	    r5, r16
     rcall   UART_WR_BYTE
     
     clr	    r16
     mov	    r5, r16
-    ldi	    r17, 12
+    ldi	    r17, 6
 _TEMP_SEND_UART_L:
     rcall   UART_WR_BYTE
     dec	    r17
@@ -1126,7 +1155,7 @@ DIV_LOOP:
     ret
 //</editor-fold>
 
-   //<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
+//<editor-fold defaultstate="collapsed" desc="Подпрограмма: получение символа для индикатора">
 ; **** ЗАГРУЖАЕТ НУЖНЫЙ АДРЕС СИМВОЛА В R0 ***********************
 DISPLAY_DECODER:
     push     r16

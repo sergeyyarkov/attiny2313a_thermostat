@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thermostat - Terminal View</title>
+    <style>
+      body {
+        font-family: Helvetica;
+      }
+
+      #app {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      p {
+        font-size: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <h1>Terminal View</h1>
+      <p>
+        Github URL:
+        <a
+          href="https://github.com/sergeyyarkov/attiny2313a_thermostat/tree/develop"
+          target="_blank"
+        >
+          sergeyyarkov/attiny2313a_thermostat
+        </a>
+      </p>
+      <div>
+        <button id="connect_btn">Connect</button>
+        <button id="disconnect_btn">Disconnect</button>
+      </div>
+      <div style="margin-top: 1rem">
+        <h2>Data</h2>
+        <p>
+          Temperature: <span id="temp">--°C</span><br />
+          Relay Status: <span id="relay">Off</span><br />
+        </p>
+        <hr />
+        <h2>Parameters</h2>
+        <p>
+          Hysteresis: <span id="hyst_setting">--°C</span> <br />
+          Temperature: <span id="temp_setting">--°C</span> <br />
+          Mode: <span id="mode_setting">--</span><br />
+          Min: <span id="min">--°C</span><br />
+          Max: <span id="max">--°C</span>
+        </p>
+      </div>
+    </div>
+    <script>
+      var EOT = '\u0004';
+
+      class SerialPortHandler {
+        constructor(options, onConnect, onDisconnect) {
+          this.encoder = new TextEncoder();
+          this.decoder = new TextDecoder();
+          this.onConnect = onConnect;
+          this.onDisconnect = onDisconnect;
+          this.options = options;
+          this.port = null;
+          this.isOpened = false;
+          this.#setupListeners();
+        }
+
+        async open() {
+          try {
+            const port = await navigator.serial.requestPort();
+            await port.open(this.options);
+
+            this.port = port;
+            this.isOpened = true;
+
+            return this.port.getInfo();
+          } catch (error) {
+            console.error(error);
+            throw error;
+          }
+        }
+
+        async close() {
+          await this.port.close();
+          this.isOpened = false;
+        }
+
+        async read() {
+          while (this.port.readable) {
+            const reader = this.port.readable.getReader();
+
+            try {
+              while (true) {
+                const { value, done } = await reader.read();
+                const decoded = this.decoder.decode(value);
+
+                if (done || decoded.includes(EOT)) {
+                  reader.releaseLock();
+                  return value;
+                }
+              }
+            } catch (error) {
+              console.error(error);
+              throw error;
+            } finally {
+              reader.releaseLock();
+            }
+          }
+        }
+
+        #setupListeners() {
+          navigator.serial.addEventListener('connect', this.onConnect);
+          navigator.serial.addEventListener('disconnect', this.onDisconnect);
+        }
+      }
+
+      var $connectBtn = document.getElementById('connect_btn');
+      var $disconnectBtn = document.getElementById('disconnect_btn');
+      var $temp = document.getElementById('temp');
+      var $relay = document.getElementById('relay');
+      var $hystSetting = document.getElementById('hyst_setting');
+      var $tempSetting = document.getElementById('temp_setting');
+      var $modeSetting = document.getElementById('mode_setting');
+      var $min = document.getElementById('min');
+      var $max = document.getElementById('max');
+
+      var serialPort = new SerialPortHandler(
+        { baudRate: 9600 },
+        () => console.log('Device connected.'),
+        () => console.log('Device disconnected.')
+      );
+
+      $connectBtn.addEventListener('click', async () => {
+        if (serialPort.isOpened) return;
+        const portInfo = await serialPort.open();
+        console.log('Port opened: ', portInfo);
+      });
+
+      $disconnectBtn.addEventListener('click', async () => {
+        await serialPort.close();
+        console.log('Port closed');
+      });
+
+      setInterval(async () => {
+        if (serialPort.isOpened) {
+          var packet = await serialPort.read();
+          if (packet.length !== 16) return;
+          var data = {
+            temperature: (parseInt(`${packet[0]}${packet[1]}`) / 10).toFixed(1),
+            isRelayClosed: packet[2],
+            parameters: {
+              hysteresis: packet[3] / 10,
+              temp: (packet[4] << 8) | (packet[5] & 0x00ff),
+              mode: packet[6] >= 1 ? 'HEATING' : 'COOLING',
+            },
+            state: packet[7] == 1 ? 'PROGRAMMING' : packet[7] == '0' ? 'DEFAULT' : 'UNDEFINED',
+            sreg: packet[8],
+          };
+
+          /* convert to signed */
+          if (data.sreg & (1 << 6)) data.temperature = -data.temperature;
+
+          /* "1200" is max unsigned temperature */
+          if (data.parameters.temp > 1200) {
+            data.parameters.temp = -(((~data.parameters.temp & 0xff) + 1) / 10);
+          } else {
+            data.parameters.temp /= 10;
+          }
+
+          $temp.textContent = data.temperature + '°C';
+          $relay.textContent = data.isRelayClosed ? 'ON' : 'OFF';
+          $hystSetting.textContent = data.parameters.hysteresis + '°C';
+          $tempSetting.textContent = data.parameters.temp + '°C';
+          $modeSetting.textContent = data.parameters.mode;
+          $min.textContent = data.parameters.temp - data.parameters.hysteresis;
+          $max.textContent = data.parameters.temp + data.parameters.hysteresis;
+        }
+      }, 751);
+    </script>
+  </body>
+</html>
