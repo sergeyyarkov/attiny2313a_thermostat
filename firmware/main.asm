@@ -106,9 +106,9 @@ _indicate_1:
     cpi       r20, 0
     brne      _indicate_2
 
-    cbi       PORTD, DIGIT_2_PIN
-    cbi       PORTD, DIGIT_3_PIN
-    cbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_2_PIN
+    sbi       PORTD, DIGIT_3_PIN
+    sbi       PORTD, DIGIT_4_PIN
     brts      PC+2
     rjmp      PC+3
     ldi	      TEMP_REG_A, 11 ; // -
@@ -116,9 +116,9 @@ _indicate_1:
     lds	      TEMP_REG_A, DIGITS+2
     tst	      TEMP_REG_A
     breq      PC+3
-    sbi       PORTD, DIGIT_1_PIN
-    rjmp      PC+2
     cbi       PORTD, DIGIT_1_PIN
+    rjmp      PC+2
+    sbi       PORTD, DIGIT_1_PIN
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
 
@@ -126,16 +126,16 @@ _indicate_2:
     cpi       r20, 1
     brne      _indicate_3
 
-    cbi       PORTD, DIGIT_1_PIN
-    cbi       PORTD, DIGIT_3_PIN
-    cbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_1_PIN
+    sbi       PORTD, DIGIT_3_PIN
+    sbi       PORTD, DIGIT_4_PIN
     lds       TEMP_REG_A, DIGITS+1
     lds	      r19, DIGITS+2
     or	      TEMP_REG_A, r19
     breq      PC+3
-    sbi	      PORTD, DIGIT_2_PIN
+    cbi	      PORTD, DIGIT_2_PIN
     rjmp      PC+2
-    cbi       PORTD, DIGIT_2_PIN
+    sbi       PORTD, DIGIT_2_PIN
     lds       TEMP_REG_A, DIGITS+1
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
@@ -144,10 +144,10 @@ _indicate_3:
     cpi       r20, 2
     brne      _indicate_4
     
-    cbi       PORTD, DIGIT_1_PIN
-    cbi       PORTD, DIGIT_2_PIN
-    cbi       PORTD, DIGIT_4_PIN
-    sbi       PORTD, DIGIT_3_PIN
+    sbi       PORTD, DIGIT_1_PIN
+    sbi       PORTD, DIGIT_2_PIN
+    sbi       PORTD, DIGIT_4_PIN
+    cbi       PORTD, DIGIT_3_PIN
     lds       TEMP_REG_A, DIGITS
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
@@ -156,10 +156,10 @@ _indicate_4:
     cpi       r20, 3
     brne      _indicate_exit
 
-    cbi       PORTD, DIGIT_1_PIN
-    cbi       PORTD, DIGIT_2_PIN
-    cbi       PORTD, DIGIT_3_PIN
-    sbi       PORTD, DIGIT_4_PIN
+    sbi       PORTD, DIGIT_1_PIN
+    sbi       PORTD, DIGIT_2_PIN
+    sbi       PORTD, DIGIT_3_PIN
+    cbi       PORTD, DIGIT_4_PIN
     lds       TEMP_REG_A, DIGITS+3
     rcall     DISPLAY_DECODER
     rcall     USI_TRANSMIT
@@ -191,6 +191,7 @@ MCU_INIT:
     outi      r16, DDRD, (1<<LED_PGM_PIN) | (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN) | (1<<UART_TX_PIN) | (1<<RELAY_PIN)
     outi      r16, DDRB, (1<<USI_CLK_PIN) | (1<<USI_DO_PIN) | (1<<USI_LATCH_PIN) | (0<<SW_PLUS_PIN) | (0<<SW_MINUS_PIN) | (0<<SW_SET_PIN) | (1<<BUZZER_PIN)
     outi      r16, PORTB, (1<<SW_PLUS_PIN) | (1<<SW_MINUS_PIN) | (1<<SW_SET_PIN)
+    outi      r16, PORTD, (1<<DIGIT_1_PIN) | (1<<DIGIT_2_PIN) | (1<<DIGIT_3_PIN) | (1<<DIGIT_4_PIN)
 
     ; **** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРА 0 (8 бит) *************************
     outi      r16, TCCR0A, (1<<WGM01)             ; режим CTC Compare A
@@ -803,10 +804,10 @@ _SW_SET_FROM_0_TO_1:
     rjmp    _SW_CHECK_ON_1
 _SAVE_SETTINGS:
     outi    r17, TIMSK, (0<<OCIE0A)
-    cbi     PORTD, DIGIT_1_PIN
-    cbi     PORTD, DIGIT_2_PIN
-    cbi     PORTD, DIGIT_3_PIN
-    cbi     PORTD, DIGIT_4_PIN
+    sbi     PORTD, DIGIT_1_PIN
+    sbi     PORTD, DIGIT_2_PIN
+    sbi     PORTD, DIGIT_3_PIN
+    sbi     PORTD, DIGIT_4_PIN
     clr	    REPROGRAM_STEP_r
     rcall   WRITE_PARAMS_TO_EEP
     rcall   BEEP_LONG
