@@ -1,5 +1,5 @@
 
-AVRASM ver. 2.2.7  main.asm Thu Jul 06 23:43:26 2023
+AVRASM ver. 2.2.7  main.asm Sat Jul 08 00:55:30 2023
 
 [builtin](2): Including file '/home/sergeyyarkov/.mchp_packs/Microchip/ATtiny_DFP/3.0.151/avrasm/inc\tn2313Adef.inc'
 main.asm(15): Including file 'definitions.asm'
